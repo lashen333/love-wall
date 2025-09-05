@@ -1,0 +1,37 @@
+{
+  "name": "world-biggest-photo-wall",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "cloudinary": "^1.41.0",
+    "framer-motion": "^10.16.0",
+    "lucide-react": "^0.294.0",
+    "mongoose": "^8.0.0",
+    "multer": "^1.4.5-lts.1",
+    "next": "14.0.0",
+    "postcss": "^8",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-dropzone": "^14.2.3",
+    "react-hot-toast": "^2.4.1",
+    "react-pageflip": "^2.0.3",
+    "stripe": "^14.0.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@types/multer": "^1.4.11",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.0"
+  }
+}
