@@ -1,4 +1,4 @@
-// src/components/PhotoAlbum.tsx
+// src\components\PhotoAlbum.tsx
 'use client';
 
 import React, {
@@ -9,6 +9,7 @@ import React, {
   forwardRef,
   memo,
 } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { Camera } from 'lucide-react';
@@ -127,6 +128,7 @@ export default function PhotoAlbum({ couples: couplesFromProps, loading: loading
   const [loading, setLoading] = useState<boolean>(!!loadingProp || !couplesFromProps);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [query, setQuery] = useState('');
   // layout
   const [pageSize, setPageSize] = useState({ w: 340, h: 480 }); // mobile-first
   const [pagesPerView, setPagesPerView] = useState<1 | 2>(1);
@@ -220,6 +222,12 @@ export default function PhotoAlbum({ couples: couplesFromProps, loading: loading
     [couples]
   );
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return approvedCouples;
+    return approvedCouples.filter((c) => (c.names || '').toLowerCase().includes(q));
+  }, [approvedCouples, query]);
+
   // pages (+ pad for spread)
   const pages: (Couple | null)[] = useMemo(() => {
     const base = approvedCouples;
@@ -258,6 +266,15 @@ export default function PhotoAlbum({ couples: couplesFromProps, loading: loading
 
   return (
     <div ref={hostRef} className="w-full">
+      {/* Search */}
+      <div className="mb-4 flex justify-center">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search couple names..."
+          className="w-full sm:w-1/2 px-4 py-2 border rounded-lg"
+        />
+      </div>
       {/* Album Header */}
       <div className="text-center mb-6 sm:mb-10">
         <motion.div
@@ -268,56 +285,71 @@ export default function PhotoAlbum({ couples: couplesFromProps, loading: loading
         >
           <Camera className="w-5 h-5 text-pink-500" />
           <span className="text-sm sm:text-base font-semibold text-gray-700">
-            {approvedCouples.length} Photos in Album • Oldest first
+            {query.trim() ? filtered.length : approvedCouples.length} Photos in Album • Oldest first
           </span>
         </motion.div>
       </div>
+      {/* If searching, show a simple grid of matching couples; otherwise show flipbook */}
+      {query.trim() ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {filtered.map((c) => (
+            <Link key={c._id} href={`/album/${encodeURIComponent(c.slug)}`} className="block bg-white rounded-lg overflow-hidden shadow">
+              <div className="w-full h-48 bg-gray-100">
+                <img src={firstSrc(c)} alt={c.names} className="w-full h-full object-cover" />
+              </div>
+              <div className="p-3">
+                <div className="font-semibold text-sm truncate">{c.names}</div>
+                <div className="text-xs text-gray-500">{c.country || ''}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="mx-auto select-none">
+          <HTMLFlipBook
+            key={`${pageSize.w}x${pageSize.h}-${pagesPerView}`} // remount on layout change
+            width={pageSize.w}
+            height={pageSize.h}
+            size="stretch"
+            maxShadowOpacity={0.35}
+            showCover
+            mobileScrollSupport
+            usePortrait={pagesPerView === 1}
+            drawShadow
+            flippingTime={550}
+            className="shadow-2xl"
+            onInit={() => setActivePage(0)}
+            onFlip={(e: any) => {
+              const bookIndex: number = typeof e?.data === 'number' ? e.data : 0;
+              setActivePage(Math.max(0, bookIndex - 1));
+            }}
+          >
+            {/* Front Cover */}
+            <AlbumPage index={-1} isCover width={pageSize.w} height={pageSize.h} />
 
-      {/* Flipbook */}
-      <div className="mx-auto select-none">
-        <HTMLFlipBook
-          key={`${pageSize.w}x${pageSize.h}-${pagesPerView}`} // remount on layout change
-          width={pageSize.w}
-          height={pageSize.h}
-          size="stretch"
-          maxShadowOpacity={0.35}
-          showCover
-          mobileScrollSupport
-          usePortrait={pagesPerView === 1}
-          drawShadow
-          flippingTime={550}
-          className="shadow-2xl"
-          onInit={() => setActivePage(0)}
-          onFlip={(e: any) => {
-            const bookIndex: number = typeof e?.data === 'number' ? e.data : 0;
-            setActivePage(Math.max(0, bookIndex - 1));
-          }}
-        >
-          {/* Front Cover */}
-          <AlbumPage index={-1} isCover width={pageSize.w} height={pageSize.h} />
+            {pages.map((c, idx) => {
+              const isActive =
+                pagesPerView === 1
+                  ? activePage === idx
+                  : activePage === idx || activePage + 1 === idx;
 
-          {pages.map((c, idx) => {
-            const isActive =
-              pagesPerView === 1
-                ? activePage === idx
-                : activePage === idx || activePage + 1 === idx;
+              return (
+                <AlbumPage
+                  key={c?._id ?? `blank-${idx}`} // stable key
+                  index={idx}
+                  couple={c ?? undefined}
+                  width={pageSize.w}
+                  height={pageSize.h}
+                  isActive={isActive}
+                />
+              );
+            })}
 
-            return (
-              <AlbumPage
-                key={c?._id ?? `blank-${idx}`} // stable key
-                index={idx}
-                couple={c ?? undefined}
-                width={pageSize.w}
-                height={pageSize.h}
-                isActive={isActive}
-              />
-            );
-          })}
-
-          {/* Back Cover */}
-          <AlbumPage index={9999} isCover width={pageSize.w} height={pageSize.h} />
-        </HTMLFlipBook>
-      </div>
+            {/* Back Cover */}
+            <AlbumPage index={9999} isCover width={pageSize.w} height={pageSize.h} />
+          </HTMLFlipBook>
+        </div>
+      )}
 
       <p className="mt-4 text-center text-xs text-gray-500">
         Tip: Swipe on mobile or click/drag corners on desktop to turn pages.

@@ -119,11 +119,11 @@ export default function HomePageClient({
             <div className="bg-white rounded-full h-4 max-w-2xl mx-auto shadow-lg overflow-hidden">
               <div
                 className="bg-gradient-to-r from-pink-500 to-rose-600 h-full transition-all duration-1000 ease-out"
-                style={{ width: `${(totalCount / 10000) * 100}%` }}
+                style={{ width: `${(totalCount / 1000000) * 100}%` }}
               />
             </div>
             <p className="text-lg text-gray-600 mt-3">
-              {totalCount.toLocaleString()} / 10,000 spots taken
+              {totalCount.toLocaleString()} / 1,000,000 spots taken
             </p>
           </motion.div>
         </div>

@@ -1,20 +1,16 @@
 // src\app\page.tsx
 import type { Couple } from '@/types';
 import HomePageClient from './HomePageClient';
+import dbConnect from '@/lib/mongodb';
+import CoupleModel from '@/lib/models/Couple';
 
 async function getCouples(): Promise<Couple[]> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    'http://localhost:3000';
-
-  const res = await fetch(
-    `${baseUrl}/api/couples?status=approved&limit=100`,
-    { cache: 'no-store' }
-  );
-
-  const json = await res.json();
-  return json?.data ?? [];
+  await dbConnect();
+  const docs = await CoupleModel.find({ status: 'approved' })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+  return (docs as unknown) as Couple[];
 }
 
 export default async function Page({

@@ -1,158 +1,132 @@
 /* src\app\globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+
+
+
+/* If Tailwind/PostCSS isn't running, ensure `postcss.config.js` includes Tailwind and
+  that your build runs PostCSS on this file. */
+/* Design tokens: use :root so PostCSS + Tailwind handle variables correctly */
+:root {
+  --color-pink-50: #fff1f2;
+  --color-rose-50: #ffe4e6;
+}
+
+/* ---- Base (no @tailwind base needed in v4) ---- */
 @layer base {
   html {
     scroll-behavior: smooth;
   }
-  
   body {
-    @apply bg-gradient-to-br from-pink-50 to-rose-100 min-h-screen;
+    min-height: 100vh;
+    background-image: linear-gradient(to bottom right, var(--color-pink-50), var(--color-rose-50));
   }
 }
 
+/* ---- Components ---- */
 @layer components {
   .heart-tile {
     @apply w-5 h-5 rounded-sm transition-all duration-300 hover:scale-110 cursor-pointer;
   }
-  
   .heart-tile-filled {
     @apply bg-gradient-to-br from-pink-400 to-rose-600 shadow-lg;
   }
-  
   .heart-tile-empty {
     @apply bg-gradient-to-br from-pink-200 to-rose-300 opacity-60;
   }
-  
   .gradient-text {
     @apply bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent;
   }
-  
   .card-hover {
     @apply transition-all duration-300 hover:scale-105 hover:shadow-xl;
   }
-  
   .upload-zone {
     @apply border-2 border-dashed border-pink-300 rounded-lg p-8 text-center transition-all duration-300 hover:border-pink-400 hover:bg-pink-50;
   }
-  
   .upload-zone-active {
     @apply border-pink-500 bg-pink-100;
   }
 
-  /* Photo Album Specific Styles */
+  /* Photo Album */
   .photo-grid {
     @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6;
   }
-  
   .photo-card {
     @apply relative overflow-hidden rounded-lg shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl;
   }
-  
   .photo-image {
     @apply h-48 sm:h-56 md:h-64 bg-cover bg-center relative;
   }
-  
   .photo-overlay {
     @apply absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300;
   }
-  
   .photo-info {
-    @apply absolute bottom-0 left-0 right-0 p-3 md:p-4 text-white transform translate-y-full group-hover:translate-y-0 transition-transform duration-300;
+    @apply absolute bottom-0 left-0 right-0 p-3 md:p-4 text-white translate-y-full group-hover:translate-y-0 transition-transform duration-300;
   }
-  
   .photo-badge {
     @apply absolute top-2 left-2 bg-pink-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center;
   }
-  
   .photo-caption {
     @apply mt-3 px-1;
   }
-  
   .photo-title {
     @apply font-semibold text-gray-800 mb-1 text-sm md:text-base truncate;
   }
-  
   .photo-meta {
     @apply flex items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600;
   }
-  
-  /* Responsive Modal */
+
+  /* Modal */
   .photo-modal {
     @apply fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-2 sm:p-4;
   }
-  
   .photo-modal-content {
     @apply bg-white rounded-lg max-w-sm sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto;
   }
-  
   .photo-modal-body {
     @apply p-4 sm:p-6;
   }
-  
   .photo-modal-title {
     @apply text-xl sm:text-2xl font-bold text-gray-800;
   }
-  
   .photo-modal-text {
     @apply text-sm sm:text-base;
   }
 
-  /* View Toggle Styles */
+  /* View Toggle */
   .view-toggle {
     @apply bg-white/80 backdrop-blur-sm rounded-full p-1 shadow-lg;
   }
-  
   .view-toggle-button {
     @apply px-4 py-2 rounded-full text-sm font-medium transition-all duration-200;
   }
-  
   .view-toggle-active {
     @apply bg-pink-500 text-white shadow-md;
   }
-  
   .view-toggle-inactive {
     @apply text-gray-600 hover:text-pink-500;
   }
 }
 
+/* ---- Utilities ---- */
 @layer utilities {
   .text-shadow {
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
   }
-  
+
   .heart-shape {
     clip-path: path('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z');
   }
-  
-  /* Mobile-first responsive utilities */
-  .mobile-only {
-    @apply block sm:hidden;
-  }
-  
-  .desktop-only {
-    @apply hidden sm:block;
-  }
-  
-  .tablet-up {
-    @apply hidden md:block;
-  }
-  
-  .mobile-tablet {
-    @apply block lg:hidden;
-  }
-  
-  /* Touch-friendly spacing */
-  .touch-target {
-    @apply min-w-[44px] min-h-[44px];
-  }
-  
-  /* Smooth scrolling for mobile */
-  .scroll-smooth-mobile {
-    -webkit-overflow-scrolling: touch;
-  }
+
+  /* Mobile-first responsive helpers */
+  .mobile-only { @apply block sm:hidden; }
+  .desktop-only { @apply hidden sm:block; }
+  .tablet-up { @apply hidden md:block; }
+  .mobile-tablet { @apply block lg:hidden; }
+
+  /* Touch friendly */
+  .touch-target { @apply min-w-[44px] min-h-[44px]; }
+  .scroll-smooth-mobile { -webkit-overflow-scrolling: touch; }
 
   /* Mobile optimizations */
   .mobile-optimized {
@@ -165,8 +139,19 @@
     user-select: none;
   }
 
-  /* Better touch interactions */
+  /* Expanded instead of applying custom classes (Tailwind @apply only accepts utility classes) */
   .touch-friendly {
-    @apply touch-target mobile-optimized;
+    @apply min-w-[44px] min-h-[44px];
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
   }
+
+  /* Hide thin scrollbars for small scrollers */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }

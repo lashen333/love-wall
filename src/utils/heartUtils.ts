@@ -29,8 +29,8 @@ export const generateHeartPoints = (centerX: number, centerY: number, size: numb
     }
   }
   
-  // Limit to 10,000 points
-  return points.slice(0, 10000);
+  // Limit to 1,000,000 points
+  return points.slice(0, 1000000);
 };
 
 const isPointInHeart = (x: number, y: number, size: number): boolean => {
@@ -61,11 +61,11 @@ export const generateSecretCode = (): string => {
   return Math.random().toString().slice(2, 10); // 8-digit number
 };
 
-export const calculateProgress = (filledTiles: number, totalTiles: number = 10000): number => {
+export const calculateProgress = (filledTiles: number, totalTiles: number = 1000000): number => {
   return Math.min((filledTiles / totalTiles) * 100, 100);
 };
 
-export const formatProgressText = (filledTiles: number, totalTiles: number = 10000): string => {
+export const formatProgressText = (filledTiles: number, totalTiles: number = 1000000): string => {
   return `${filledTiles.toLocaleString()} / ${totalTiles.toLocaleString()} spots taken`;
 };
 
