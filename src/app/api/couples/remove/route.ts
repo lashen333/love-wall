@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
     }
     
     // Find couple by names and secret code
-    const couple = await Couple.findOne({
+    const couple = (await Couple.findOne({
       names: names.trim(),
       secretCode: secretCode.trim(),
-    });
+    }).lean()) as any | null;
     
     if (!couple) {
       return NextResponse.json(
@@ -29,12 +29,11 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-    
     // Log removal reason if provided
     if (reason) {
       console.log(`Photo removal requested for ${couple.names}: ${reason}`);
     }
-    
+
     // Delete the couple record
     await Couple.findByIdAndDelete(couple._id);
     

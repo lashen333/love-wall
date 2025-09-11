@@ -1,359 +1,603 @@
-// src\components\PhotoAlbum.tsx
+// src/components/LoveCarousel.tsx
 'use client';
 
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  forwardRef,
-  memo,
-} from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
-import { Camera } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  Share2,
+  Copy,
+  ExternalLink,
+} from 'lucide-react';
 import type { Couple } from '@/types';
 
-// client-only
-const HTMLFlipBook: React.ComponentType<any> = dynamic(
-  () => import('react-pageflip').then((m: any) => m.default),
-  { ssr: false }
-) as any;
-
-type CouplesAPI = { success: boolean; data: Couple[] };
-
-const PLACEHOLDER = 'https://placehold.co/1200x1600?text=Image+Unavailable';
-
-/* ---------------- helpers ---------------- */
-
-function firstSrc(c?: Couple) {
-  return (c?.photoUrl && String(c.photoUrl))
-    || (c?.thumbUrl && String(c.thumbUrl))
-    || PLACEHOLDER;
-}
-function fallbackSrc(c?: Couple, tried?: string) {
-  const photo = (c?.photoUrl && String(c.photoUrl)) || '';
-  const thumb = (c?.thumbUrl && String(c.thumbUrl)) || '';
-  if (tried && tried === photo && thumb) return thumb;
-  return PLACEHOLDER;
-}
-
-/* ---------------- AlbumPage ---------------- */
-
-type AlbumPageProps = {
-  index: number;
-  couple?: Couple;
-  width: number;
-  height: number;
-  isCover?: boolean;
-  isActive?: boolean; // visible page(s)
+type ApiCouples = {
+  success: boolean;
+  data: Couple[];
+  pagination: { page: number; limit: number; total: number; pages: number };
 };
 
-const AlbumPage = memo(
-  forwardRef<HTMLDivElement, AlbumPageProps>(function AlbumPage(
-    { index, couple, width, height, isCover, isActive },
-    ref
-  ) {
-    const [src, setSrc] = useState<string>(firstSrc(couple));
-    useEffect(() => {
-      setSrc(firstSrc(couple));
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [couple?._id]);
+const PLACEHOLDER =
+  'https://placehold.co/1200x1600/ec4899/ffffff?text=Image+Unavailable';
 
-    const handleError = () => setSrc((prev) => fallbackSrc(couple, prev));
-
-    return (
-      <div
-        ref={ref}
-        className="bg-white rounded-lg shadow-lg overflow-hidden relative flex flex-col"
-        style={{ width, height }}
-      >
-        <div className="absolute top-2 left-2 z-10 text-[11px] px-2 py-0.5 rounded-full bg-black/60 text-white">
-          {isCover ? 'Album' : `#${index + 1}`}
-        </div>
-
-        {couple ? (
-          <>
-            {/* full-bleed image */}
-            <div className="relative flex-1">
-              <img
-                src={src}
-                alt={couple.names}
-                onError={handleError}
-                loading={isActive ? 'eager' : 'lazy'}
-                fetchPriority={isActive ? 'high' : 'auto'}
-                decoding="async"
-                draggable={false}
-                referrerPolicy="no-referrer"
-                className="absolute inset-0 w-full h-full object-cover [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
-              />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
-            </div>
-
-            {/* caption */}
-            <div className="p-3 md:p-4 bg-white">
-              <h3 className="font-semibold text-gray-800 truncate">{couple.names}</h3>
-              <div className="mt-1 text-xs text-gray-600 flex gap-3 flex-wrap">
-                {couple.weddingDate && (
-                  <span>{new Date(couple.weddingDate).toLocaleDateString()}</span>
-                )}
-                {couple.country && <span className="truncate">{couple.country}</span>}
-              </div>
-              {couple.story && (
-                <p className="mt-2 text-xs text-gray-500 line-clamp-2">{couple.story}</p>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 grid place-items-center text-gray-400 text-xs">—</div>
-        )}
-      </div>
-    );
-  })
-);
-
-/* ---------------- main component ---------------- */
+const bestSrc = (c?: Couple) =>
+  (c?.thumbUrl && String(c.thumbUrl)) ||
+  (c?.photoUrl && String(c.photoUrl)) ||
+  PLACEHOLDER;
 
 type Props = {
-  couples?: Couple[];   // pass from server if you have it; else we self-fetch
-  loading?: boolean;
+  fetchLimit?: number; // default 200
+  interval?: number; // default 4500ms
+  showCtaSlide?: boolean; // default true
 };
 
-export default function PhotoAlbum({ couples: couplesFromProps, loading: loadingProp }: Props) {
-  const hostRef = useRef<HTMLDivElement>(null);
+export default function LoveCarousel({
+  fetchLimit = 200,
+  interval = 4500,
+  showCtaSlide = true,
+}: Props) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLUListElement>(null);
+  const hoverRef = useRef(false);
+  const focusRef = useRef(false);
 
   // data
-  const [couples, setCouples] = useState<Couple[]>(couplesFromProps ?? []);
-  const [loading, setLoading] = useState<boolean>(!!loadingProp || !couplesFromProps);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [rows, setRows] = useState<Couple[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
 
-  const [query, setQuery] = useState('');
-  // layout
-  const [pageSize, setPageSize] = useState({ w: 340, h: 480 }); // mobile-first
-  const [pagesPerView, setPagesPerView] = useState<1 | 2>(1);
-  const [activePage, setActivePage] = useState(0);
+  // search
+  const [q, setQ] = useState('');
+  const [matchIndex, setMatchIndex] = useState(0);
 
-  const usingProps = Array.isArray(couplesFromProps);
+  // carousel
+  const [idx, setIdx] = useState(0);
+  const [slideW, setSlideW] = useState(0);
+  const timerRef = useRef<number | null>(null);
 
-  // keep in sync with parent
+  // story modal
+  const [storyOf, setStoryOf] = useState<Couple | null>(null);
+
+  // fetch approved couples (oldest first)
   useEffect(() => {
-    if (!usingProps) return;
-    setCouples(couplesFromProps ?? []);
-    setLoading(!!loadingProp);
-    setErrorMsg(null);
-  }, [usingProps, couplesFromProps, loadingProp]);
-
-  // self-fetch when no props
-  useEffect(() => {
-    if (usingProps) return;
-    let cancelled = false;
-
+    const ctrl = new AbortController();
     (async () => {
       try {
         setLoading(true);
-        setErrorMsg(null);
-        const res = await fetch('/api/couples?status=approved&limit=100', { cache: 'no-store' });
-        const json: CouplesAPI = await res.json();
-        if (!json.success) throw new Error('API returned success=false');
-
-        // oldest-first
-        const ordered = (json.data ?? []).slice().sort((a, b) => {
-          const ta = new Date(a.createdAt ?? 0).getTime();
-          const tb = new Date(b.createdAt ?? 0).getTime();
-          return ta - tb;
+        setErr(null);
+        const res = await fetch(`/api/couples?status=approved&limit=${fetchLimit}`, {
+          cache: 'no-store',
+          signal: ctrl.signal,
         });
-        if (!cancelled) setCouples(ordered);
+        const json: ApiCouples = await res.json();
+        if (!json.success) throw new Error('Failed to load photos');
+
+        const data = (json.data || [])
+          .filter((c) => (c.status ?? 'approved').toLowerCase() === 'approved')
+          .sort(
+            (a, b) =>
+              new Date(a.createdAt ?? 0).getTime() -
+              new Date(b.createdAt ?? 0).getTime()
+          );
+
+        setRows(data);
+        setTotal(json.pagination.total);
       } catch (e: any) {
-        const msg = e?.message || '';
-        if (!cancelled && !/aborted/i.test(msg)) setErrorMsg(msg || 'Failed to load');
+        if (e?.name !== 'AbortError') setErr(e?.message || 'Failed to load photos');
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     })();
+    return () => ctrl.abort();
+  }, [fetchLimit]);
 
-    return () => { cancelled = true; };
-  }, [usingProps]);
+  // slides (CTA as slide 0)
+  const slides = useMemo(() => {
+    const arr: Array<{ type: 'cta' | 'photo'; couple?: Couple }> = [];
+    if (showCtaSlide) arr.push({ type: 'cta' });
+    rows.forEach((c) => arr.push({ type: 'photo', couple: c }));
+    return arr;
+  }, [rows, showCtaSlide]);
 
-  // debounced responsive sizing (prevents flipbook DOM churn)
+  // measure slide width (stage width)
   useEffect(() => {
-    let raf = 0;
-    const updateNow = () => {
-      const el = hostRef.current;
-      if (!el) return;
-      const containerW = el.clientWidth;
+    const update = () => setSlideW(stageRef.current?.clientWidth || 0);
+    update();
 
-      const two = containerW >= 700;
-      const nextPPV: 1 | 2 = two ? 2 : 1;
+    let ro: ResizeObserver | null = null;
+    if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
+      ro = new (window as any).ResizeObserver(update);
+      if (ro && stageRef.current) {
+        ro.observe(stageRef.current);
+      }
+    }
 
-      const targetPageW = two
-        ? Math.min(420, Math.floor(containerW / 2) - 24)
-        : Math.min(380, containerW - 24);
-      const targetPageH = Math.round(targetPageW * 1.4);
+    window.addEventListener('resize', update);
 
-      setPagesPerView((prev) => (prev === nextPPV ? prev : nextPPV));
-      setPageSize((prev) =>
-        prev.w === targetPageW && prev.h === targetPageH ? prev : { w: targetPageW, h: targetPageH }
-      );
-    };
-    const onResize = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(updateNow);
-    };
-
-    updateNow();
-    window.addEventListener('resize', onResize);
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', update);
+      ro?.disconnect();
     };
   }, []);
 
-  // approved-only
-  const approvedCouples = useMemo(
-    () =>
-      couples
-        .filter((c) => (c.status ?? '').toString().toLowerCase() === 'approved')
-        .sort((a, b) => {
-          const ta = new Date(a.createdAt ?? 0).getTime();
-          const tb = new Date(b.createdAt ?? 0).getTime();
-          return ta - tb;
-        }),
-    [couples]
-  );
+  // sync track width & translate
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || slideW <= 0) return;
+    track.style.width = `${slides.length * slideW}px`;
+    track.style.transform = `translate3d(${-idx * slideW}px,0,0)`;
+  }, [slideW, idx, slides.length]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return approvedCouples;
-    return approvedCouples.filter((c) => (c.names || '').toLowerCase().includes(q));
-  }, [approvedCouples, query]);
+  // autoplay (pause on hover, focus, hidden tab, or open story)
+  useEffect(() => {
+    const move = () => setIdx((i) => (i + 1) % Math.max(1, slides.length));
+    const start = () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      timerRef.current = window.setInterval(() => {
+        if (!hoverRef.current && !focusRef.current && !document.hidden && !storyOf)
+          move();
+      }, Math.max(2000, interval));
+    };
+    start();
+    const vis = () => {
+      if (!document.hidden) start();
+    };
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      document.removeEventListener('visibilitychange', vis);
+    };
+  }, [slides.length, interval, storyOf]);
 
-  // pages (+ pad for spread)
-  const pages: (Couple | null)[] = useMemo(() => {
-    const base = approvedCouples;
-    const needsPad = pagesPerView === 2 && base.length % 2 !== 0;
-    return needsPad ? [...base, null] : base;
-  }, [approvedCouples, pagesPerView]);
+  // search matches
+  const matches = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    if (!ql) return [];
+    const m: number[] = [];
+    slides.forEach((s, i) => {
+      if (s.type === 'photo' && (s.couple?.names || '').toLowerCase().includes(ql)) {
+        m.push(i);
+      }
+    });
+    return m;
+  }, [q, slides]);
 
-  // states
-  if (loading) {
-    return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="animate-pulse rounded-lg bg-gray-200 h-64" />
-        ))}
-      </div>
-    );
-  }
-  if (errorMsg) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-semibold mb-1">Photo Album</h3>
-        <p className="text-red-600 font-medium">Failed to load album.</p>
-        <p className="text-gray-500 text-sm mt-1">{errorMsg}</p>
-      </div>
-    );
-  }
-  if (approvedCouples.length === 0) {
-    return (
-      <div className="text-center py-16 sm:py-20">
-        <Camera className="w-16 h-16 text-pink-300 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-700 mb-2">Photo Album is Empty</h3>
-        <p className="text-gray-500 px-4">Be the first couple to join our photo album!</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (matches.length === 0) return;
+    setMatchIndex(0);
+    setIdx(matches[0]);
+  }, [matches.length]);
+
+  // Enter / Shift+Enter cycles matches
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!q.trim()) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (matches.length === 0) return;
+        const dir = e.shiftKey ? -1 : 1;
+        const next = (matchIndex + dir + matches.length) % matches.length;
+        setMatchIndex(next);
+        setIdx(matches[next]);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [q, matches, matchIndex]);
+
+  const jump = (i: number) => setIdx((i + slides.length) % slides.length);
+  const next = () => jump(idx + 1);
+  const prev = () => jump(idx - 1);
 
   return (
-    <div ref={hostRef} className="w-full">
-      {/* Search */}
-      <div className="mb-4 flex justify-center">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search couple names..."
-          className="w-full sm:w-1/2 px-4 py-2 border rounded-lg"
+    <section className="w-full">
+      {/* search + counts */}
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => (focusRef.current = true)}
+            onBlur={() => (focusRef.current = false)}
+            placeholder="Search couple names… (Enter to jump)"
+            className="w-full pl-10 pr-10 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+          />
+          {!!q && (
+            <button
+              onClick={() => setQ('')}
+              className="absolute right-2 top-2 p-1 rounded hover:bg-gray-100"
+              aria-label="Clear"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          )}
+        </div>
+
+        <div className="hidden sm:block text-sm text-gray-600">
+          {q.trim()
+            ? matches.length > 0
+              ? `Matches: ${matchIndex + 1}/${matches.length}`
+              : 'No matches'
+            : `${Math.max(0, rows.length)} photos • Total ${total.toLocaleString()}`}
+        </div>
+      </div>
+
+      {/* stage */}
+      <div
+        ref={stageRef}
+        className="relative overflow-hidden rounded-2xl shadow-2xl"
+        style={{
+          height: 'clamp(380px, 58vh, 640px)',
+          background:
+            'radial-gradient(120% 120% at 70% 20%, #fff 0%, #ffe4e6 60%, #fdf2f8 100%)',
+        }}
+        onMouseEnter={() => (hoverRef.current = true)}
+        onMouseLeave={() => (hoverRef.current = false)}
+      >
+        <ul
+          ref={trackRef}
+          className="absolute inset-0 flex transition-transform duration-700 ease-[cubic-bezier(.22,.61,.36,1)]"
+          style={{ willChange: 'transform' }}
+        >
+          {loading && (
+            <li style={{ width: slideW }} className="relative shrink-0">
+              <div className="absolute inset-0 grid place-items-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
+              </div>
+            </li>
+          )}
+
+          {!loading &&
+            slides.map((s, i) => (
+              <li key={i} style={{ width: slideW }} className="relative shrink-0">
+                {s.type === 'cta' ? (
+                  <CtaSlide />
+                ) : (
+                  <PhotoSlide couple={s.couple!} onOpenStory={() => setStoryOf(s.couple!)} />
+                )}
+              </li>
+            ))}
+        </ul>
+
+        {/* arrows (z-20 so they sit above slides, but below banner z-30) */}
+        {slides.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              className="hidden sm:flex absolute inset-y-0 left-0 w-16 items-center justify-center group z-20"
+              aria-label="Previous"
+            >
+              <span className="p-2 rounded-full bg-black/40 text-white group-hover:bg-black/60">
+                <ChevronLeft className="w-6 h-6" />
+              </span>
+            </button>
+            <button
+              onClick={next}
+              className="hidden sm:flex absolute inset-y-0 right-0 w-16 items-center justify-center group z-20"
+              aria-label="Next"
+            >
+              <span className="p-2 rounded-full bg-black/40 text-white group-hover:bg-black/60">
+                <ChevronRight className="w-6 h-6" />
+              </span>
+            </button>
+
+            {/* mobile edge hotspots — smaller and under the banner */}
+            <button
+              onClick={prev}
+              className="sm:hidden absolute inset-y-0 left-0 w-1/4 z-10"
+              aria-label="Prev"
+            />
+            <button
+              onClick={next}
+              className="sm:hidden absolute inset-y-0 right-0 w-1/4 z-10"
+              aria-label="Next"
+            />
+          </>
+        )}
+      </div>
+
+      {err && <p className="mt-3 text-center text-rose-700 font-medium">{err}</p>}
+
+      <p className="mt-3 text-center text-xs text-gray-600">
+        Tip: Type a name to jump • Join thousands of couples celebrating their story.
+      </p>
+
+      {/* full story modal */}
+      {storyOf && <StoryDialog couple={storyOf} onClose={() => setStoryOf(null)} />}
+    </section>
+  );
+}
+
+/* ---------------- Slides ---------------- */
+
+function CtaSlide() {
+  return (
+    <div className="relative h-full">
+      <div className="absolute inset-4 grid place-items-center rounded-xl bg-gradient-to-br from-white/80 to-white/60 shadow">
+        <div className="text-center px-6">
+          <div className="text-2xl sm:text-4xl font-extrabold text-rose-700">
+            Add your love
+          </div>
+          <p className="mt-2 text-rose-900/80 text-sm max-w-md mx-auto">
+            Become part of the world’s biggest love album. Your photo inspires the next couple ♥
+          </p>
+          <Link
+            href="/add"
+            className="inline-block mt-4 px-6 py-2 rounded-full bg-rose-600 text-white font-semibold hover:bg-rose-700"
+          >
+            Upload your photo
+          </Link>
+          <p className="mt-3 text-[11px] text-gray-500">
+            Safe • Reviewed • Looks great on mobile
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PhotoSlide({
+  couple,
+  onOpenStory,
+}: {
+  couple: Couple;
+  onOpenStory: () => void;
+}) {
+  const src = bestSrc(couple);
+  const big = (couple.photoUrl && String(couple.photoUrl)) || src;
+  const hasStory = !!(couple.story && couple.story.trim().length > 0);
+
+  // small share popover local state
+  const [shareOpen, setShareOpen] = useState(false);
+
+  const pageUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/album/${encodeURIComponent(couple.slug)}`
+      : `/album/${encodeURIComponent(couple.slug)}`;
+
+  const shareText = `${couple.names} on the World's Biggest Love Album`;
+
+  const doShare = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({ title: couple.names, text: shareText, url: pageUrl });
+        setShareOpen(false);
+      } else {
+        // fallback: open small menu
+        setShareOpen((v) => !v);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+      setShareOpen(false);
+      alert('Link copied!');
+    } catch {
+      // ignore
+    }
+  };
+
+  const openShare = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <figure className="relative h-full">
+      {/* image frame */}
+      <div className="absolute inset-4 bg-white rounded-xl shadow-lg overflow-hidden z-20">
+        <div className="absolute inset-0">
+          <img
+            src={src}
+            alt=""
+            aria-hidden
+            crossOrigin="anonymous"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover blur-[18px] scale-110 opacity-40"
+          />
+        </div>
+        <img
+          src={big}
+          alt={couple.names}
+          loading="eager"
+          decoding="async"
+          crossOrigin="anonymous"
+          className="relative z-10 w-full h-full object-contain"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+          }}
         />
       </div>
-      {/* Album Header */}
-      <div className="text-center mb-6 sm:mb-10">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-full px-5 py-3 shadow-lg"
+
+      {/* banner (at the bottom, above hotspots) */}
+      <figcaption className="absolute left-6 right-6 bottom-6 z-30">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow px-4 py-3 md:px-5 md:py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold text-base md:text-lg text-neutral-900 truncate">
+                {couple.names}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {couple.weddingDate && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] bg-rose-50 text-rose-700">
+                    {new Date(couple.weddingDate).toLocaleDateString()}
+                  </span>
+                )}
+                {couple.country && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] bg-rose-50 text-rose-700">
+                    {couple.country}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              <Link
+                href={`/album/${encodeURIComponent(couple.slug)}`}
+                className="rounded-full bg-rose-600 text-white text-xs md:text-sm font-semibold px-3 py-1.5 hover:bg-rose-700 inline-flex items-center gap-1"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View
+              </Link>
+
+              {hasStory && (
+                <button
+                  onClick={onOpenStory}
+                  className="rounded-full border border-rose-200 text-rose-700 text-xs md:text-sm font-semibold px-3 py-1.5 hover:bg-rose-50"
+                >
+                  Love story
+                </button>
+              )}
+
+              <div className="relative">
+                <button
+                  onClick={doShare}
+                  className="rounded-full border border-rose-200 text-rose-700 text-xs md:text-sm font-semibold px-3 py-1.5 hover:bg-rose-50 inline-flex items-center gap-1"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
+
+                {/* fallback share popover */}
+                {shareOpen && (
+                  <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-white shadow-lg p-2 z-40">
+                    <button
+                      onClick={() =>
+                        openShare(
+                          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                            pageUrl
+                          )}`
+                        )
+                      }
+                      className="w-full text-left text-sm px-3 py-2 rounded hover:bg-gray-100"
+                    >
+                      Share on Facebook
+                    </button>
+                    <button
+                      onClick={() =>
+                        openShare(
+                          `https://twitter.com/intent/tweet?url=${encodeURIComponent(
+                            pageUrl
+                          )}&text=${encodeURIComponent(shareText)}`
+                        )
+                      }
+                      className="w-full text-left text-sm px-3 py-2 rounded hover:bg-gray-100"
+                    >
+                      Share on X (Twitter)
+                    </button>
+                    <button
+                      onClick={() =>
+                        openShare(
+                          `https://wa.me/?text=${encodeURIComponent(
+                            `${shareText} ${pageUrl}`
+                          )}`
+                        )
+                      }
+                      className="w-full text-left text-sm px-3 py-2 rounded hover:bg-gray-100"
+                    >
+                      Share on WhatsApp
+                    </button>
+                    <button
+                      onClick={copyLink}
+                      className="w-full text-left text-sm px-3 py-2 rounded hover:bg-gray-100 inline-flex items-center gap-2"
+                    >
+                      <Copy className="w-4 h-4" /> Copy link
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </figcaption>
+    </figure>
+  );
+}
+
+/* ---------------- Story Dialog ---------------- */
+
+function StoryDialog({ couple, onClose }: { couple: Couple; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const img = bestSrc(couple);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm grid place-items-center p-3 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/70 text-white"
+          aria-label="Close"
         >
-          <Camera className="w-5 h-5 text-pink-500" />
-          <span className="text-sm sm:text-base font-semibold text-gray-700">
-            {query.trim() ? filtered.length : approvedCouples.length} Photos in Album • Oldest first
-          </span>
-        </motion.div>
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="grid md:grid-cols-2">
+          {/* Image */}
+          <div className="bg-black md:h-full max-h-[40vh] md:max-h-none">
+            <img
+              src={img}
+              alt={couple.names}
+              loading="eager"
+              decoding="async"
+              crossOrigin="anonymous"
+              className="w-full h-full object-contain"
+            />
+          </div>
+
+          {/* Story */}
+          <div className="p-4 md:p-6 max-h-[70vh] md:max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg md:text-xl font-semibold text-neutral-900">
+              {couple.names}
+            </h3>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {couple.weddingDate && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] bg-rose-50 text-rose-700">
+                  {new Date(couple.weddingDate).toLocaleDateString()}
+                </span>
+              )}
+              {couple.country && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] bg-rose-50 text-rose-700">
+                  {couple.country}
+                </span>
+              )}
+              <Link
+                href={`/album/${encodeURIComponent(couple.slug)}`}
+                className="ml-auto rounded-full bg-rose-600 text-white text-xs font-semibold px-3 py-1.5 hover:bg-rose-700 inline-flex items-center gap-1"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View page
+              </Link>
+            </div>
+
+            {couple.story && (
+              <blockquote className="mt-4 text-[15px] md:text-base leading-7 text-neutral-800">
+                <p>{couple.story}</p>
+              </blockquote>
+            )}
+          </div>
+        </div>
       </div>
-      {/* If searching, show a simple grid of matching couples; otherwise show flipbook */}
-      {query.trim() ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {filtered.map((c) => (
-            <Link key={c._id} href={`/album/${encodeURIComponent(c.slug)}`} className="block bg-white rounded-lg overflow-hidden shadow">
-              <div className="w-full h-48 bg-gray-100">
-                <img src={firstSrc(c)} alt={c.names} className="w-full h-full object-cover" />
-              </div>
-              <div className="p-3">
-                <div className="font-semibold text-sm truncate">{c.names}</div>
-                <div className="text-xs text-gray-500">{c.country || ''}</div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="mx-auto select-none">
-          <HTMLFlipBook
-            key={`${pageSize.w}x${pageSize.h}-${pagesPerView}`} // remount on layout change
-            width={pageSize.w}
-            height={pageSize.h}
-            size="stretch"
-            maxShadowOpacity={0.35}
-            showCover
-            mobileScrollSupport
-            usePortrait={pagesPerView === 1}
-            drawShadow
-            flippingTime={550}
-            className="shadow-2xl"
-            onInit={() => setActivePage(0)}
-            onFlip={(e: any) => {
-              const bookIndex: number = typeof e?.data === 'number' ? e.data : 0;
-              setActivePage(Math.max(0, bookIndex - 1));
-            }}
-          >
-            {/* Front Cover */}
-            <AlbumPage index={-1} isCover width={pageSize.w} height={pageSize.h} />
-
-            {pages.map((c, idx) => {
-              const isActive =
-                pagesPerView === 1
-                  ? activePage === idx
-                  : activePage === idx || activePage + 1 === idx;
-
-              return (
-                <AlbumPage
-                  key={c?._id ?? `blank-${idx}`} // stable key
-                  index={idx}
-                  couple={c ?? undefined}
-                  width={pageSize.w}
-                  height={pageSize.h}
-                  isActive={isActive}
-                />
-              );
-            })}
-
-            {/* Back Cover */}
-            <AlbumPage index={9999} isCover width={pageSize.w} height={pageSize.h} />
-          </HTMLFlipBook>
-        </div>
-      )}
-
-      <p className="mt-4 text-center text-xs text-gray-500">
-        Tip: Swipe on mobile or click/drag corners on desktop to turn pages.
-      </p>
     </div>
   );
 }

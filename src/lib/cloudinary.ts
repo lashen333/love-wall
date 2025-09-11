@@ -1,7 +1,7 @@
 // src\lib\cloudinary.ts
 import { v2 as cloudinary } from 'cloudinary';
 
-// Configure Cloudinary
+// Configure Cloudinary (server-side only)
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -25,9 +25,6 @@ export interface CloudinaryTransformOptions {
   format?: 'jpg' | 'png' | 'webp' | 'auto';
 }
 
-/**
- * Upload image to Cloudinary with optimization
- */
 export const uploadImage = async (
   file: Buffer | string,
   options: {
@@ -37,7 +34,6 @@ export const uploadImage = async (
   } = {}
 ): Promise<CloudinaryUploadResult> => {
   try {
-    // Convert Buffer to base64 string for Cloudinary
     let uploadData: string;
     if (Buffer.isBuffer(file)) {
       uploadData = `data:image/jpeg;base64,${file.toString('base64')}`;
@@ -60,7 +56,7 @@ export const uploadImage = async (
     }
 
     const result = await cloudinary.uploader.upload(uploadData, uploadOptions);
-    
+
     return {
       public_id: result.public_id,
       secure_url: result.secure_url,
@@ -74,67 +70,61 @@ export const uploadImage = async (
     throw new Error('Failed to upload image to Cloudinary');
   }
 };
-/**
- * Alternative upload function using streams for better memory handling
- */
+
 export const uploadImageStream = async (
-    file: Buffer,
-    options: {
-      folder?: string;
-      public_id?: string;
-      transformation?: CloudinaryTransformOptions;
-    } = {}
-  ): Promise<CloudinaryUploadResult> => {
-    try {
-      const uploadOptions: any = {
-        folder: options.folder || 'wedding-photos',
-        resource_type: 'image',
-        transformation: {
-          quality: 'auto:good',
-          fetch_format: 'auto',
-          ...options.transformation,
-        },
-      };
-  
-      if (options.public_id) {
-        uploadOptions.public_id = options.public_id;
-      }
-  
-      // Use stream upload for better memory handling
-      return new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          uploadOptions,
-          (error, result) => {
-            if (error) {
-              reject(error);
-            } else if (result) {
-              resolve({
-                public_id: result.public_id,
-                secure_url: result.secure_url,
-                width: result.width,
-                height: result.height,
-                format: result.format,
-                bytes: result.bytes,
-              });
-            } else {
-              reject(new Error('Upload failed'));
-            }
-          }
-        );
-  
-        // Create a readable stream from buffer
-        const { Readable } = require('stream');
-        const stream = Readable.from(file);
-        stream.pipe(uploadStream);
-      });
-    } catch (error) {
-      console.error('Cloudinary upload error:', error);
-      throw new Error('Failed to upload image to Cloudinary');
+  file: Buffer,
+  options: {
+    folder?: string;
+    public_id?: string;
+    transformation?: CloudinaryTransformOptions;
+  } = {}
+): Promise<CloudinaryUploadResult> => {
+  try {
+    const uploadOptions: any = {
+      folder: options.folder || 'wedding-photos',
+      resource_type: 'image',
+      transformation: {
+        quality: 'auto:good',
+        fetch_format: 'auto',
+        ...options.transformation,
+      },
+    };
+
+    if (options.public_id) {
+      uploadOptions.public_id = options.public_id;
     }
-  };
-/**
- * Generate thumbnail URL from existing image
- */
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        uploadOptions,
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else if (result) {
+            resolve({
+              public_id: result.public_id,
+              secure_url: result.secure_url,
+              width: result.width,
+              height: result.height,
+              format: result.format,
+              bytes: result.bytes,
+            });
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        }
+      );
+
+      const { Readable } = require('stream');
+      const stream = Readable.from(file);
+      stream.pipe(uploadStream);
+    });
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    throw new Error('Failed to upload image to Cloudinary');
+  }
+};
+
 export const generateThumbnailUrl = (
   publicId: string,
   size: number = 400,
@@ -155,9 +145,6 @@ export const generateThumbnailUrl = (
   });
 };
 
-/**
- * Generate optimized full-size image URL
- */
 export const generateOptimizedUrl = (
   publicId: string,
   maxWidth: number = 2048,
@@ -178,9 +165,6 @@ export const generateOptimizedUrl = (
   });
 };
 
-/**
- * Delete image from Cloudinary
- */
 export const deleteImage = async (publicId: string): Promise<boolean> => {
   try {
     const result = await cloudinary.uploader.destroy(publicId);
@@ -191,9 +175,6 @@ export const deleteImage = async (publicId: string): Promise<boolean> => {
   }
 };
 
-/**
- * Get image info from Cloudinary
- */
 export const getImageInfo = async (publicId: string) => {
   try {
     const result = await cloudinary.api.resource(publicId);

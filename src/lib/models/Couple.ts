@@ -56,19 +56,15 @@ const coupleSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Index for efficient queries
 coupleSchema.index({ status: 1, createdAt: -1 });
 coupleSchema.index({ secretCode: 1, names: 1 });
 
-// Virtual for formatted wedding date
 coupleSchema.virtual('formattedWeddingDate').get(function() {
   if (!this.weddingDate) return null;
   return this.weddingDate.toLocaleDateString();
 });
 
-// Ensure virtuals are serialized
 coupleSchema.set('toJSON', { virtuals: true });
 coupleSchema.set('toObject', { virtuals: true });
 
 export default mongoose.models.Couple || mongoose.model('Couple', coupleSchema);
-
