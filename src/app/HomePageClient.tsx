@@ -1,11 +1,11 @@
 // src\app\HomePageClient.tsx
-// src/app/HomePageClient.tsx
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { HeartWall } from '@/components/HeartWall';
-import PhotoAlbum from '@/components/PhotoAlbum';
+import  HeartWall  from '@/components/heart-wall/HeartWall';
+import PhotoAlbum from '@/components/photo-album';
 import { UploadForm } from '@/components/UploadForm';
 import { PhotoRemoval } from '@/components/PhotoRemoval';
 import type { Couple } from '@/types';
@@ -155,7 +155,7 @@ export default function HomePageClient({
           </motion.h2>
 
           {/* Pass couples so PhotoAlbum does NOT self-fetch */}
-          <PhotoAlbum />
+          <PhotoAlbum interval={2000}/>
         </div>
       </section>
 
