@@ -3,20 +3,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Couple from '@/lib/models/Couple';
 import { generateSlug } from '@/utils/heartUtils';
-import { uploadImageStream, generateThumbnailUrl, generateOptimizedUrl } from '@/lib/cloudinary';
+import {
+  uploadImageStream,
+  generateThumbnailUrl,
+  generateOptimizedUrl,
+} from '@/lib/cloudinary';
 
+// ---- Force Node serverless runtime (Cloudinary/Buffer need Node) ----
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;          // optional: give uploads more time
+export const preferredRegion = 'auto';  // optional
+
+// placeholder helper
 const ph = (text: string, w = 800, h = 600) =>
   `https://placehold.co/${w}x${h}/ec4899/ffffff?text=${encodeURIComponent(text)}`;
 
+// ---------- GET: list couples ----------
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
     const status = searchParams.get('status') || 'approved';
-
     const skip = (page - 1) * limit;
 
     // Oldest first to match UI label
@@ -63,15 +74,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ---------- POST: create couple + upload photo ----------
 export async function POST(request: NextRequest) {
   try {
+    // --- env guards (surface misconfig in Vercel quickly) ---
+    const missing: string[] = [];
+    if (!process.env.MONGODB_URI) missing.push('MONGODB_URI');
+    if (!process.env.CLOUDINARY_CLOUD_NAME) missing.push('CLOUDINARY_CLOUD_NAME');
+    if (!process.env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
+    if (!process.env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
+    if (missing.length) {
+      console.error('Missing envs:', missing.join(', '));
+      return NextResponse.json(
+        { success: false, error: `Server misconfigured: ${missing.join(', ')}` },
+        { status: 500 }
+      );
+    }
+
     await dbConnect();
 
     const formData = await request.formData();
-
-    const names = formData.get('names') as string;
-    const photo = formData.get('photo') as File;
-    const secretCode = formData.get('secretCode') as string;
+    const names = (formData.get('names') as string | null)?.trim() || '';
+    const photo = formData.get('photo') as File | null;
+    const secretCode = (formData.get('secretCode') as string | null) || '';
 
     if (!names || !photo || !secretCode) {
       return NextResponse.json(
@@ -80,51 +105,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let slug = generateSlug(names);
-    let attempts = 0;
-
-    while (attempts < 10) {
-      const existing = await Couple.findOne({ slug });
-      if (!existing) break;
-      slug = generateSlug(names);
-      attempts++;
+    // --- Vercel body limit guard (~4.5–5 MB for Node functions) ---
+    const MAX_BYTES = 4_500_000;
+    if (photo.size > MAX_BYTES) {
+      return NextResponse.json(
+        { success: false, error: 'Image too large. Please upload a photo under 4.5 MB.' },
+        { status: 413 }
+      );
     }
 
-    if (attempts >= 10) {
+    // --- unique slug generation with retry ---
+    let slug = generateSlug(names);
+    for (let i = 0; i < 10; i++) {
+      const exists = await Couple.findOne({ slug }).lean();
+      if (!exists) break;
+      slug = generateSlug(names);
+      if (i === 9) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to generate unique slug' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // --- upload to Cloudinary (requires Node runtime) ---
+    let photoUrl = '';
+    let thumbUrl = '';
+    try {
+      const arrayBuffer = await photo.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer); // Buffer is available in Node runtime
+
+      const res: any = await uploadImageStream(buffer, {
+        folder: 'wedding-photos',
+        
+      });
+
+      const publicId = res?.public_id;
+      if (publicId) {
+        photoUrl = generateOptimizedUrl(publicId);
+        thumbUrl = generateThumbnailUrl(publicId, 400);
+      } else if (res?.secure_url) {
+        photoUrl = res.secure_url;
+        thumbUrl = res.secure_url;
+      }
+    } catch (e: any) {
+      console.error('Cloudinary upload failed:', e?.message || e);
       return NextResponse.json(
-        { success: false, error: 'Failed to generate unique slug' },
+        { success: false, error: 'Upload failed (cloud storage).' },
         { status: 500 }
       );
     }
 
-    // Upload
-    let photoUrl = '';
-    let thumbUrl = '';
-
+    // --- save record in DB ---
     try {
-      if (photo) {
-        const arrayBuffer = await (photo as any).arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        const res = await uploadImageStream(buffer, { folder: 'wedding-photos' });
-
-        if ((res as any).public_id) {
-          const publicId = (res as any).public_id;
-          photoUrl = generateOptimizedUrl(publicId);
-          thumbUrl = generateThumbnailUrl(publicId, 400);
-        } else {
-          photoUrl = res.secure_url;
-          thumbUrl = res.secure_url;
-        }
-      }
-
-      const couple = new Couple({
+      const couple = await Couple.create({
         slug,
-        names: names.trim(),
+        names,
         weddingDate: formData.get('weddingDate') || null,
         country: formData.get('country') || null,
         story: formData.get('story') || null,
-        // use placehold.co as safe fallback (not via.placeholder.com)
         photoUrl: photoUrl || ph(names, 800, 600),
         thumbUrl: thumbUrl || ph(names, 400, 400),
         secretCode,
@@ -132,11 +171,9 @@ export async function POST(request: NextRequest) {
         paymentId: 'temp-payment-id',
       });
 
-      await couple.save();
-
-      const obj = couple.toObject({ virtuals: true });
+      const obj: any = couple.toObject({ virtuals: true });
       const normalized = {
-        _id: obj._id ? String(obj._id) : '',
+        _id: String(obj._id ?? ''),
         slug: obj.slug,
         names: obj.names,
         weddingDate: obj.weddingDate ? new Date(obj.weddingDate).toISOString() : null,
@@ -151,13 +188,16 @@ export async function POST(request: NextRequest) {
         updatedAt: obj.updatedAt ? new Date(obj.updatedAt).toISOString() : null,
       };
 
-      return NextResponse.json({ success: true, data: normalized, message: 'Couple record created successfully' });
-    } catch (err) {
-      console.error('Error uploading to Cloudinary or saving couple:', err);
-      return NextResponse.json({ success: false, error: 'Failed to upload image or save record' }, { status: 500 });
+      return NextResponse.json({ success: true, data: normalized });
+    } catch (e: any) {
+      console.error('DB save failed:', e?.message || e);
+      return NextResponse.json(
+        { success: false, error: 'Database save failed.' },
+        { status: 500 }
+      );
     }
-  } catch (error) {
-    console.error('Error creating couple:', error);
+  } catch (e: any) {
+    console.error('Unexpected error:', e?.message || e);
     return NextResponse.json(
       { success: false, error: 'Failed to create couple record' },
       { status: 500 }
