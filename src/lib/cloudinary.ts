@@ -1,11 +1,11 @@
-// src\lib\cloudinary.ts
+// src/lib/cloudinary.ts
 import { v2 as cloudinary } from 'cloudinary';
 
-// Configure Cloudinary (server-side only)
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,   // must be set in Vercel
+  api_key: process.env.CLOUDINARY_API_KEY!,         // must be set in Vercel
+  api_secret: process.env.CLOUDINARY_API_SECRET!,   // must be set in Vercel
+  secure: true,
 });
 
 export interface CloudinaryUploadResult {
@@ -25,109 +25,38 @@ export interface CloudinaryTransformOptions {
   format?: 'jpg' | 'png' | 'webp' | 'auto';
 }
 
-export const uploadImage = async (
-  file: Buffer | string,
-  options: {
-    folder?: string;
-    public_id?: string;
-    transformation?: CloudinaryTransformOptions;
-  } = {}
-): Promise<CloudinaryUploadResult> => {
-  try {
-    let uploadData: string;
-    if (Buffer.isBuffer(file)) {
-      uploadData = `data:image/jpeg;base64,${file.toString('base64')}`;
-    } else {
-      uploadData = file;
-    }
-
-    const uploadOptions: any = {
-      folder: options.folder || 'wedding-photos',
-      resource_type: 'image',
-      transformation: {
-        quality: 'auto:good',
-        fetch_format: 'auto',
-        ...options.transformation,
-      },
-    };
-
-    if (options.public_id) {
-      uploadOptions.public_id = options.public_id;
-    }
-
-    const result = await cloudinary.uploader.upload(uploadData, uploadOptions);
-
-    return {
-      public_id: result.public_id,
-      secure_url: result.secure_url,
-      width: result.width,
-      height: result.height,
-      format: result.format,
-      bytes: result.bytes,
-    };
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw new Error('Failed to upload image to Cloudinary');
-  }
-};
-
 export const uploadImageStream = async (
-  file: Buffer,
-  options: {
-    folder?: string;
-    public_id?: string;
-    transformation?: CloudinaryTransformOptions;
-  } = {}
+  buffer: Buffer,
+  options: { folder?: string; public_id?: string } = {}
 ): Promise<CloudinaryUploadResult> => {
-  try {
-    const uploadOptions: any = {
-      folder: options.folder || 'wedding-photos',
-      resource_type: 'image',
-      transformation: {
-        quality: 'auto:good',
-        fetch_format: 'auto',
-        ...options.transformation,
-      },
-    };
+  const uploadOptions: any = {
+    folder: options.folder || 'wedding-photos',
+    resource_type: 'image',
+  };
+  if (options.public_id) uploadOptions.public_id = options.public_id;
 
-    if (options.public_id) {
-      uploadOptions.public_id = options.public_id;
-    }
-
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        uploadOptions,
-        (error, result) => {
-          if (error) {
-            reject(error);
-          } else if (result) {
-            resolve({
-              public_id: result.public_id,
-              secure_url: result.secure_url,
-              width: result.width,
-              height: result.height,
-              format: result.format,
-              bytes: result.bytes,
-            });
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        }
-      );
-
-      const { Readable } = require('stream');
-      const stream = Readable.from(file);
-      stream.pipe(uploadStream);
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+      if (error) return reject(error);
+      if (!result) return reject(new Error('No result from Cloudinary'));
+      resolve({
+        public_id: result.public_id,
+        secure_url: result.secure_url,
+        width: result.width,
+        height: result.height,
+        format: result.format,
+        bytes: result.bytes,
+      });
     });
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw new Error('Failed to upload image to Cloudinary');
-  }
+
+    // The simplest, most reliable way: write the whole buffer and end.
+    stream.end(buffer);
+  });
 };
 
 export const generateThumbnailUrl = (
   publicId: string,
-  size: number = 400,
+  size = 400,
   options: CloudinaryTransformOptions = {}
 ): string => {
   const transformation = {
@@ -138,16 +67,12 @@ export const generateThumbnailUrl = (
     fetch_format: 'auto',
     ...options,
   };
-
-  return cloudinary.url(publicId, {
-    transformation: [transformation],
-    secure: true,
-  });
+  return cloudinary.url(publicId, { transformation: [transformation], secure: true });
 };
 
 export const generateOptimizedUrl = (
   publicId: string,
-  maxWidth: number = 2048,
+  maxWidth = 2048,
   options: CloudinaryTransformOptions = {}
 ): string => {
   const transformation = {
@@ -158,31 +83,7 @@ export const generateOptimizedUrl = (
     fetch_format: 'auto',
     ...options,
   };
-
-  return cloudinary.url(publicId, {
-    transformation: [transformation],
-    secure: true,
-  });
-};
-
-export const deleteImage = async (publicId: string): Promise<boolean> => {
-  try {
-    const result = await cloudinary.uploader.destroy(publicId);
-    return result.result === 'ok';
-  } catch (error) {
-    console.error('Cloudinary delete error:', error);
-    return false;
-  }
-};
-
-export const getImageInfo = async (publicId: string) => {
-  try {
-    const result = await cloudinary.api.resource(publicId);
-    return result;
-  } catch (error) {
-    console.error('Cloudinary get info error:', error);
-    throw new Error('Failed to get image info');
-  }
+  return cloudinary.url(publicId, { transformation: [transformation], secure: true });
 };
 
 export default cloudinary;

@@ -1,25 +1,19 @@
-// src\app\api\couples\route.ts
+// src/app/api/couples/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Couple from '@/lib/models/Couple';
 import { generateSlug } from '@/utils/heartUtils';
-import {
-  uploadImageStream,
-  generateThumbnailUrl,
-  generateOptimizedUrl,
-} from '@/lib/cloudinary';
+import { uploadImageStream, generateThumbnailUrl, generateOptimizedUrl } from '@/lib/cloudinary';
 
-// ---- Force Node serverless runtime (Cloudinary/Buffer need Node) ----
+// Ensure Node runtime (Cloudinary SDK + Buffer need NodeJS, not Edge)
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;          // optional: give uploads more time
-export const preferredRegion = 'auto';  // optional
+export const maxDuration = 60;
 
-// placeholder helper
 const ph = (text: string, w = 800, h = 600) =>
   `https://placehold.co/${w}x${h}/ec4899/ffffff?text=${encodeURIComponent(text)}`;
 
-// ---------- GET: list couples ----------
+// ---------- GET ----------
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
@@ -30,14 +24,13 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'approved';
     const skip = (page - 1) * limit;
 
-    // Oldest first to match UI label
     const couples = await Couple.find({ status })
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const normalizedCouples = (couples as any[]).map((d) => ({
+    const normalized = (couples as any[]).map((d) => ({
       _id: d._id ? String(d._id) : '',
       slug: d.slug,
       names: d.names,
@@ -57,32 +50,21 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: normalizedCouples,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
+      data: normalized,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
     console.error('Error fetching couples:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch couples' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Failed to fetch couples' }, { status: 500 });
   }
 }
 
-// ---------- POST: create couple + upload photo ----------
+// ---------- POST ----------
 export async function POST(request: NextRequest) {
   try {
-    // --- env guards (surface misconfig in Vercel quickly) ---
-    const missing: string[] = [];
-    if (!process.env.MONGODB_URI) missing.push('MONGODB_URI');
-    if (!process.env.CLOUDINARY_CLOUD_NAME) missing.push('CLOUDINARY_CLOUD_NAME');
-    if (!process.env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
-    if (!process.env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
+    // Strict env validation (empty strings count as missing)
+    const needed = ['MONGODB_URI', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'] as const;
+    const missing = needed.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
     if (missing.length) {
       console.error('Missing envs:', missing.join(', '));
       return NextResponse.json(
@@ -96,25 +78,22 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const names = (formData.get('names') as string | null)?.trim() || '';
     const photo = formData.get('photo') as File | null;
-    const secretCode = (formData.get('secretCode') as string | null) || '';
+    const secretCode = (formData.get('secretCode') as string | null)?.trim() || '';
 
     if (!names || !photo || !secretCode) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    // --- Vercel body limit guard (~4.5–5 MB for Node functions) ---
+    // Body limit guard (Vercel Node ~4.5–5 MB)
     const MAX_BYTES = 4_500_000;
     if (photo.size > MAX_BYTES) {
       return NextResponse.json(
-        { success: false, error: 'Image too large. Please upload a photo under 4.5 MB.' },
+        { success: false, error: 'Image too large. Please upload a photo under ~4.5 MB.' },
         { status: 413 }
       );
     }
 
-    // --- unique slug generation with retry ---
+    // Unique slug retry
     let slug = generateSlug(names);
     for (let i = 0; i < 10; i++) {
       const exists = await Couple.findOne({ slug }).lean();
@@ -128,35 +107,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- upload to Cloudinary (requires Node runtime) ---
+    // Upload to Cloudinary
     let photoUrl = '';
     let thumbUrl = '';
     try {
       const arrayBuffer = await photo.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer); // Buffer is available in Node runtime
+      const buffer = Buffer.from(arrayBuffer);
 
-      const res: any = await uploadImageStream(buffer, {
-        folder: 'wedding-photos',
-        
-      });
+      // NOTE: do not pass resource_type here; the helper sets it
+      const res = await uploadImageStream(buffer, { folder: 'wedding-photos' });
 
-      const publicId = res?.public_id;
+      const publicId = (res as any)?.public_id;
       if (publicId) {
         photoUrl = generateOptimizedUrl(publicId);
         thumbUrl = generateThumbnailUrl(publicId, 400);
-      } else if (res?.secure_url) {
-        photoUrl = res.secure_url;
-        thumbUrl = res.secure_url;
+      } else if ((res as any)?.secure_url) {
+        photoUrl = (res as any).secure_url;
+        thumbUrl = (res as any).secure_url;
+      } else {
+        throw new Error('Upload returned no secure_url/public_id');
       }
     } catch (e: any) {
       console.error('Cloudinary upload failed:', e?.message || e);
+      // Return a specific error so you can see it in the client toast/logs
       return NextResponse.json(
-        { success: false, error: 'Upload failed (cloud storage).' },
+        { success: false, error: `Upload failed: ${e?.message || 'cloud storage error'}` },
         { status: 500 }
       );
     }
 
-    // --- save record in DB ---
+    // Save record
     try {
       const couple = await Couple.create({
         slug,
@@ -191,16 +171,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, data: normalized });
     } catch (e: any) {
       console.error('DB save failed:', e?.message || e);
-      return NextResponse.json(
-        { success: false, error: 'Database save failed.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: 'Database save failed.' }, { status: 500 });
     }
   } catch (e: any) {
     console.error('Unexpected error:', e?.message || e);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create couple record' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Failed to create couple record' }, { status: 500 });
   }
 }
