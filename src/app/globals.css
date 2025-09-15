@@ -155,3 +155,17 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
+/* globals.css */
+.upload-zone {
+  @apply rounded-xl border-2 border-dashed border-gray-300 p-6 grid place-items-center cursor-pointer transition;
+  background: #fafafa;
+}
+.upload-zone:hover { @apply border-pink-400; }
+.upload-zone-active { @apply border-pink-500 bg-pink-50; }
+/* forces wrapping for long unbroken strings */
+.prose-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;    /* handles looooong tokens */
+  word-break: break-word;     /* safe fallback */
+}
+

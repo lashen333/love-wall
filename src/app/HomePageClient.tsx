@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import  HeartWall  from '@/components/heart-wall/HeartWall';
 import PhotoAlbum from '@/components/photo-album';
-import { UploadForm } from '@/components/UploadForm';
+import { UploadForm } from '@/components/upload-form';
 import { PhotoRemoval } from '@/components/PhotoRemoval';
 import type { Couple } from '@/types';
 
@@ -191,7 +191,7 @@ export default function HomePageClient({
       <footer className="py-12 px-4 text-center text-gray-600">
         <div className="max-w-4xl mx-auto">
           <p className="text-lg mb-4">Made with ❤️ for couples around the world</p>
-          <p className="text-sm">© 2024 World&apos;s Biggest Married Couple Photo Wall. All rights reserved.</p>
+          <p className="text-sm">© 2025 World&apos;s Biggest Married Couple Photo Wall. All rights reserved.</p>
         </div>
       </footer>
     </div>

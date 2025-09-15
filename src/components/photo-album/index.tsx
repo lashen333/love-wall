@@ -1,4 +1,4 @@
-// src/components/photo-album/index.tsx
+// src\components\photo-album\index.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
