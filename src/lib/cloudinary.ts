@@ -1,10 +1,20 @@
-// src/lib/cloudinary.ts
+// src\lib\cloudinary.ts
 import { v2 as cloudinary } from 'cloudinary';
 
+// Debug environment variables (without showing actual values)
+console.log('=== CLOUDINARY DEBUG ===');
+console.log('Environment check:', {
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? 'SET ✓' : 'MISSING ✗',
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? 'SET ✓' : 'MISSING ✗',
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'SET ✓' : 'MISSING ✗',
+  cloud_name_length: process.env.CLOUDINARY_CLOUD_NAME?.length || 0,
+  api_key_length: process.env.CLOUDINARY_API_KEY?.length || 0,
+});
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,   // must be set in Vercel
-  api_key: process.env.CLOUDINARY_API_KEY!,         // must be set in Vercel
-  api_secret: process.env.CLOUDINARY_API_SECRET!,   // must be set in Vercel
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
   secure: true,
 });
 
@@ -29,6 +39,13 @@ export const uploadImageStream = async (
   buffer: Buffer,
   options: { folder?: string; public_id?: string } = {}
 ): Promise<CloudinaryUploadResult> => {
+  
+  console.log('🚀 Starting Cloudinary upload...', {
+    bufferSize: buffer.length,
+    folder: options.folder,
+    timestamp: new Date().toISOString()
+  });
+
   const uploadOptions: any = {
     folder: options.folder || 'wedding-photos',
     resource_type: 'image',
@@ -37,8 +54,27 @@ export const uploadImageStream = async (
 
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
-      if (error) return reject(error);
-      if (!result) return reject(new Error('No result from Cloudinary'));
+      if (error) {
+        console.error('❌ Cloudinary upload error:', {
+          message: error.message,
+          http_code: error.http_code,
+          name: error.name,
+          error: error.error
+        });
+        return reject(error);
+      }
+      
+      if (!result) {
+        console.error('❌ No result from Cloudinary');
+        return reject(new Error('No result from Cloudinary'));
+      }
+
+      console.log('✅ Cloudinary upload success:', {
+        public_id: result.public_id,
+        url_preview: result.secure_url.substring(0, 50) + '...',
+        size: result.bytes
+      });
+
       resolve({
         public_id: result.public_id,
         secure_url: result.secure_url,
@@ -49,7 +85,6 @@ export const uploadImageStream = async (
       });
     });
 
-    // The simplest, most reliable way: write the whole buffer and end.
     stream.end(buffer);
   });
 };
