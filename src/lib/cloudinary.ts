@@ -49,44 +49,77 @@ export const uploadImageStream = async (
   const uploadOptions: any = {
     folder: options.folder || 'wedding-photos',
     resource_type: 'image',
+    timeout: 60000,
+    chunk_size: 6000000, // 6MB chunks for large files
+    use_filename: false,
+    unique_filename: true,
   };
+  
   if (options.public_id) uploadOptions.public_id = options.public_id;
 
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
-      if (error) {
-        console.error('❌ Cloudinary upload error:', {
-          message: error.message,
-          http_code: error.http_code,
-          name: error.name,
-          error: error.error
-        });
-        return reject(error);
-      }
-      
-      if (!result) {
-        console.error('❌ No result from Cloudinary');
-        return reject(new Error('No result from Cloudinary'));
-      }
-
-      console.log('✅ Cloudinary upload success:', {
-        public_id: result.public_id,
-        url_preview: result.secure_url.substring(0, 50) + '...',
-        size: result.bytes
-      });
-
-      resolve({
-        public_id: result.public_id,
-        secure_url: result.secure_url,
-        width: result.width,
-        height: result.height,
-        format: result.format,
-        bytes: result.bytes,
-      });
+  // Try Method 1: Base64 upload (more reliable for Vercel)
+  try {
+    console.log('📤 Trying base64 upload method...');
+    const base64String = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    
+    const result = await cloudinary.uploader.upload(base64String, uploadOptions);
+    
+    console.log('✅ Base64 upload successful:', {
+      public_id: result.public_id,
+      bytes: result.bytes,
+      format: result.format
     });
 
-    stream.end(buffer);
-  });
+    return {
+      public_id: result.public_id,
+      secure_url: result.secure_url,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      bytes: result.bytes,
+    };
+  } catch (error: any) {
+    console.error('❌ Base64 upload failed:', error.message);
+    
+    // If base64 fails, try stream upload as fallback
+    console.log('📤 Trying stream upload as fallback...');
+    
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+        if (error) {
+          console.error('❌ Stream upload also failed:', {
+            message: error.message,
+            http_code: error.http_code,
+            name: error.name,
+            error: error.error
+          });
+          return reject(error);
+        }
+        
+        if (!result) {
+          console.error('❌ No result from Cloudinary stream upload');
+          return reject(new Error('No result from Cloudinary'));
+        }
+
+        console.log('✅ Stream upload successful as fallback:', {
+          public_id: result.public_id,
+          url_preview: result.secure_url.substring(0, 50) + '...',
+          size: result.bytes
+        });
+
+        resolve({
+          public_id: result.public_id,
+          secure_url: result.secure_url,
+          width: result.width,
+          height: result.height,
+          format: result.format,
+          bytes: result.bytes,
+        });
+      });
+
+      stream.end(buffer);
+    });
+  }
 };
 
 export const generateThumbnailUrl = (
