@@ -26,7 +26,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
   const [currentStep, setCurrentStep] = useState<Step>('payment');
   const [formData, setFormData] = useState<UploadFormData>({
     names: '',
-    email: '', // Add email field
+    email: '', // Add email field best
     weddingDate: '',
     country: '',
     story: '',
