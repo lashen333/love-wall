@@ -27,7 +27,7 @@ export default function HeartWall({ couples, loading }: Props) {
     );
   }
 
-  const filledTiles = Math.min(approved.length, 10_000); // defensive cap
+  const filledTiles = Math.min(approved.length, 1_000_000 ); // defensive cap
 
   return (
     <div className="text-center">

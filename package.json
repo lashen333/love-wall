@@ -2,7 +2,6 @@
   "name": "world-biggest-photo-wall",
   "version": "0.1.0",
   "private": true,
-  
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,6 +10,7 @@
   },
   "dependencies": {
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.1",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
@@ -20,6 +20,7 @@
     "mongoose": "^8.0.0",
     "multer": "^1.4.5-lts.1",
     "next": "14.0.0",
+    "nodemailer": "^7.0.6",
     "react": "^18",
     "react-dom": "^18",
     "react-dropzone": "^14.2.3",
@@ -36,5 +37,4 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.13"
   }
-  
 }

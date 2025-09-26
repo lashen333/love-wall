@@ -24,6 +24,21 @@ export const metadata: Metadata = {
 
   description: 'Join 1,000,000+ couples celebrating love around the world. Add your wedding photo to our massive heart-shaped grid!',
   keywords: 'wedding photos, couples, love, photo wall, marriage celebration',
+
+  icons: {
+    icon: [
+      {
+        url: '/favicon.svg',
+        type: 'image/svg+xml',
+      },
+      {
+        url: '/favicon.ico', // Fallback for older browsers
+        sizes: '32x32',
+        type: 'image/x-icon',
+      }
+    ],
+    apple: '/og-image.png', // Optional: for iOS devices
+  },
   openGraph: {
     title: 'World\'s Biggest Married Couple Photo Wall',
   description: 'Join 1,000,000+ couples celebrating love around the world',
@@ -31,7 +46,7 @@ export const metadata: Metadata = {
     url:'/',
     images: [
       {
-        url:'/og-image.jpg',
+        url:'/og-image.png',
         width: 1200,
         height: 630,
         alt: 'World\'s Biggest Married Couple Photo Wall',
@@ -42,7 +57,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'World\'s Biggest Married Couple Photo Wall',
   description: 'Join 1,000,000+ couples celebrating love around the world',
-    images: ['/og-image.jpg'],
+    images: ['/og-image.png'],
   },
   alternates:{canonical: '/'},
   robots:{index:true,follow:true},

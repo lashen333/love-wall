@@ -22,7 +22,7 @@ type Props = {
 
 export default function LoveCarousel({
   fetchLimit = 200,
-  interval = 4500,
+  interval = 500,
   showCtaSlide = true,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);

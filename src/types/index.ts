@@ -27,10 +27,23 @@ export interface Payment {
 
 export interface UploadFormData {
   names: string;
+  email:string;
   weddingDate?: string;
   country?: string;
   story: string;
   photo: File | Blob | null;
+}
+// Email-related types
+export interface EmailRequest {
+  email: string;
+  secretCode: string;
+  names: string;
+}
+
+export interface EmailResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
 }
 
 export interface HeartTile {

@@ -1,7 +1,8 @@
-// src\components\upload-form\steps\DetailsStep.tsx
+// src/components/upload-form/steps/DetailsStep.tsx
 'use client';
 
-import { ArrowLeft, ArrowRight, User } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, ArrowRight, User, Mail } from 'lucide-react';
 import type { UploadFormData } from '@/types';
 
 export default function DetailsStep({
@@ -15,7 +16,43 @@ export default function DetailsStep({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const canContinue = !!formData.names.trim();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.names.trim()) {
+      newErrors.names = 'Names are required';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email address';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateForm()) {
+      onNext();
+    }
+  };
+
+  const updateField = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const canContinue = formData.names.trim() && formData.email.trim() && !errors.names && !errors.email;
 
   return (
     <div>
@@ -28,18 +65,49 @@ export default function DetailsStep({
       </div>
 
       <div className="space-y-5 sm:space-y-6 max-w-md mx-auto">
+        {/* Names Field - Required */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Your Names *</label>
           <input
             type="text"
             value={formData.names}
-            onChange={(e) => setFormData((prev) => ({ ...prev, names: e.target.value }))}
+            onChange={(e) => updateField('names', e.target.value)}
             placeholder="e.g., Sarah & Michael"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+              errors.names ? 'border-red-500' : 'border-gray-300'
+            }`}
             required
           />
+          {errors.names && (
+            <p className="text-red-500 text-xs mt-1">{errors.names}</p>
+          )}
         </div>
 
+        {/* Email Field - Required */}
+        <div>
+          <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+            <Mail className="w-4 h-4 mr-2 text-pink-500" />
+            Email Address *
+          </label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => updateField('email', e.target.value)}
+            placeholder="your@email.com"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+              errors.email ? 'border-red-500' : 'border-gray-300'
+            }`}
+            required
+          />
+          {errors.email && (
+            <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            📧 We'll send your secret code to this email
+          </p>
+        </div>
+
+        {/* Wedding Date - Optional */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Wedding Date</label>
           <input
@@ -50,6 +118,7 @@ export default function DetailsStep({
           />
         </div>
 
+        {/* Country - Optional */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
           <input
@@ -61,6 +130,7 @@ export default function DetailsStep({
           />
         </div>
 
+        {/* Love Story - Optional */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Your Story (Optional)</label>
           <textarea
@@ -75,6 +145,11 @@ export default function DetailsStep({
         </div>
       </div>
 
+      {/* Required fields notice */}
+      <div className="text-xs text-gray-500 text-center py-2 mt-4">
+        * Required fields
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3 justify-between mt-8 max-w-md mx-auto">
         <button
           onClick={onBack}
@@ -84,7 +159,7 @@ export default function DetailsStep({
           Back
         </button>
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canContinue}
           className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >

@@ -1,3 +1,4 @@
+// src\components\upload-form\UploadForm.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -25,6 +26,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
   const [currentStep, setCurrentStep] = useState<Step>('payment');
   const [formData, setFormData] = useState<UploadFormData>({
     names: '',
+    email: '', // Add email field
     weddingDate: '',
     country: '',
     story: '',
@@ -100,8 +102,17 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
     }
   };
 
+  // Email validation function
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async () => {
+    // Validation
     if (!formData.names.trim()) return toast.error('Please enter your names');
+    if (!formData.email.trim()) return toast.error('Please enter your email address');
+    if (!validateEmail(formData.email)) return toast.error('Please enter a valid email address');
     if (!formData.photo) return toast.error('Please upload a photo');
 
     try {
@@ -111,6 +122,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
 
       const submitData = new FormData();
       submitData.append('names', formData.names);
+      submitData.append('email', formData.email);
       submitData.append('weddingDate', formData.weddingDate || '');
       submitData.append('country', formData.country || '');
       submitData.append('story', formData.story || '');
@@ -119,22 +131,61 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
 
       const response = await fetch('/api/couples', { method: 'POST', body: submitData });
       const data = await response.json();
+      
       if (data.success) {
-        toast.success('Photo submitted successfully! It will be reviewed within 24 hours.');
+        // Send email with secret code
+        await sendSecretCodeEmail(formData.email, code, formData.names);
+        
+        toast.success('Photo submitted successfully! Check your email for your secret code.');
         onPhotoAdded();
         resetForm();
       } else {
         toast.error(data.error || 'Submission failed');
       }
-    } catch {
+    } catch (error) {
+      console.error('Error submitting photo:', error);
       toast.error('Error submitting photo');
     } finally {
       setLoading(false);
     }
   };
 
+  // Function to send email with secret code
+  const sendSecretCodeEmail = async (email: string, secretCode: string, names: string) => {
+    try {
+      const response = await fetch('/api/send-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          secretCode,
+          names,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        console.error('Failed to send email:', data.error);
+        toast.error('Photo submitted but failed to send email. Please save your code: ' + secretCode);
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Photo submitted but failed to send email. Please save your code: ' + secretCode);
+    }
+  };
+
   const resetForm = () => {
-    setFormData({ names: '', weddingDate: '', country: '', story: '', photo: null as any });
+    setFormData({ 
+      names: '', 
+      email: '', 
+      weddingDate: '', 
+      country: '', 
+      story: '', 
+      photo: null as any 
+    });
     setUploadedPhoto('');
     setUploadedThumb('');
     setSecretCode('');
@@ -145,6 +196,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
     const idx = steps.findIndex((s) => s.id === currentStep);
     if (idx < steps.length - 1) setCurrentStep(steps[idx + 1].id);
   };
+  
   const prevStep = () => {
     const idx = steps.findIndex((s) => s.id === currentStep);
     if (idx > 0) setCurrentStep(steps[idx - 1].id);
@@ -178,7 +230,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2 }}
-          className="min-h-[240px] sm:min-h-[300px]"   /* shorter to avoid long card */
+          className="min-h-[240px] sm:min-h-[300px]"
         >
           {currentStep === 'payment' && (
             <PaymentStep loading={loading} onPay={handlePayment} />
