@@ -1,6 +1,5 @@
-// src\app\api\send-code\route.ts
-// pages/api/send-code.ts - SendGrid Implementation
-import { NextApiRequest, NextApiResponse } from 'next';
+// src/app/api/send-code/route.ts - Fixed App Router Implementation
+import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
 interface EmailRequest {
@@ -9,29 +8,25 @@ interface EmailRequest {
   names: string;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
-
+export async function POST(req: NextRequest) {
   try {
-    const { email, secretCode, names }: EmailRequest = req.body;
+    const { email, secretCode, names }: EmailRequest = await req.json();
 
     // Validate required fields
     if (!email || !secretCode || !names) {
-      return res.status(400).json({ 
+      return NextResponse.json({ 
         success: false, 
         error: 'Missing required fields' 
-      });
+      }, { status: 400 });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
+      return NextResponse.json({ 
         success: false, 
         error: 'Invalid email format' 
-      });
+      }, { status: 400 });
     }
 
     // Create SendGrid transporter
@@ -164,7 +159,7 @@ Need help? Contact us at support@lovewall.com with your secret code.
 
     // Send email
     const mailOptions = {
-      from: `"Love Wall" <${process.env.FROM_EMAIL || 'noreply@yourdomain.com'}>`,
+      from: process.env.FROM_EMAIL || 'Love Wall <noreply@yourdomain.com>',
       to: email,
       subject: `💕 Your Love Wall Secret Code: ${secretCode}`,
       text: textContent,
@@ -184,7 +179,7 @@ Need help? Contact us at support@lovewall.com with your secret code.
       secretCode: secretCode // Remove in production for security
     });
     
-    res.status(200).json({ 
+    return NextResponse.json({ 
       success: true, 
       message: 'Email sent successfully',
       messageId: info.messageId
@@ -197,9 +192,9 @@ Need help? Contact us at support@lovewall.com with your secret code.
       code: error.code
     });
     
-    res.status(500).json({ 
+    return NextResponse.json({ 
       success: false, 
       error: 'Failed to send email. Please try again.' 
-    });
+    }, { status: 500 });
   }
 }
