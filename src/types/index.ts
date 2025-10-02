@@ -3,6 +3,8 @@ export interface Couple {
   _id: string;
   slug: string;
   names: string;
+  email?: string;
+  phoneNumber?: string;
   weddingDate?: Date;
   country?: string;
   story?: string;
@@ -27,7 +29,8 @@ export interface Payment {
 
 export interface UploadFormData {
   names: string;
-  email:string;
+  email: string;
+  phoneNumber: string;
   weddingDate?: string;
   country?: string;
   story: string;

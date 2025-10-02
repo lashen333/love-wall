@@ -98,3 +98,90 @@ export const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Image lazy loading utility
+export const createLazyImageLoader = () => {
+  const imageCache = new Map<string, string>();
+  
+  return {
+    loadImage: (src: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        if (imageCache.has(src)) {
+          resolve(imageCache.get(src)!);
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          imageCache.set(src, src);
+          resolve(src);
+        };
+        img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+        img.src = src;
+      });
+    },
+    preloadImages: (urls: string[]): Promise<string[]> => {
+      return Promise.all(urls.map(url => {
+        return new Promise<string>((resolve, reject) => {
+          if (imageCache.has(url)) {
+            resolve(url);
+            return;
+          }
+          
+          const img = new Image();
+          img.onload = () => {
+            imageCache.set(url, url);
+            resolve(url);
+          };
+          img.onerror = () => reject(new Error(`Failed to preload: ${url}`));
+          img.src = url;
+        });
+      }));
+    },
+    clearCache: () => imageCache.clear()
+  };
+};
+
+// Optimized image resizing with better compression
+export const optimizeImage = (file: File, maxWidth: number = 1920, quality: number = 0.8): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    if (!ctx) {
+      reject(new Error('Could not get canvas context'));
+      return;
+    }
+    
+    img.onload = () => {
+      // Calculate optimal dimensions
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+      const newWidth = Math.floor(img.width * ratio);
+      const newHeight = Math.floor(img.height * ratio);
+      
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      
+      // Enable image smoothing for better quality
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to create optimized blob'));
+        }
+      }, 'image/webp', quality);
+    };
+    
+    img.onerror = () => {
+      reject(new Error('Failed to load image for optimization'));
+    };
+    
+    img.src = URL.createObjectURL(file);
+  });
+};
+

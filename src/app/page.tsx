@@ -16,6 +16,8 @@ async function getCouples(): Promise<Couple[]> {
     _id: d._id ? String(d._id) : '',
     slug: d.slug,
     names: d.names,
+    email: d.email ?? null,
+    phoneNumber: d.phoneNumber ?? null,
     weddingDate: d.weddingDate ? new Date(d.weddingDate).toISOString() : null,
     country: d.country ?? null,
     story: d.story ?? null,

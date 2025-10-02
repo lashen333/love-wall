@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
       _id: d._id ? String(d._id) : '',
       slug: d.slug,
       names: d.names,
+      email: d.email ?? null,
+      phoneNumber: d.phoneNumber ?? null,
       weddingDate: d.weddingDate ? new Date(d.weddingDate).toISOString() : null,
       country: d.country ?? null,
       story: d.story ?? null,
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const names = (formData.get('names') as string | null)?.trim() || '';
+    const email = (formData.get('email') as string | null)?.trim() || '';
+    const phoneNumber = (formData.get('phoneNumber') as string | null)?.trim() || '';
     const photo = formData.get('photo') as File | null;
     const secretCode = (formData.get('secretCode') as string | null)?.trim() || '';
 
@@ -177,6 +181,8 @@ export async function POST(request: NextRequest) {
       const couple = await Couple.create({
         slug,
         names,
+        email: email || null,
+        phoneNumber: phoneNumber || null,
         weddingDate: formData.get('weddingDate') || null,
         country: formData.get('country') || null,
         story: formData.get('story') || null,
@@ -192,6 +198,8 @@ export async function POST(request: NextRequest) {
         _id: String(obj._id ?? ''),
         slug: obj.slug,
         names: obj.names,
+        email: obj.email ?? null,
+        phoneNumber: obj.phoneNumber ?? null,
         weddingDate: obj.weddingDate ? new Date(obj.weddingDate).toISOString() : null,
         country: obj.country ?? null,
         story: obj.story ?? null,

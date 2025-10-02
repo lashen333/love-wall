@@ -24,25 +24,49 @@ export default function HomePageClient({
 
   const totalCount = useMemo(() => couples.length, [couples]);
 
-  // Periodic refresh (every 30s)
+  // Optimized periodic refresh with caching
   useEffect(() => {
     let mounted = true;
 
     const fetchCouples = async () => {
       try {
+        // Check if we have recent cached data
+        const cacheKey = 'homepage-couples';
+        const cached = sessionStorage.getItem(cacheKey);
+        const cacheTime = sessionStorage.getItem(`${cacheKey}-time`);
+        const now = Date.now();
+        const maxAge = 2 * 60 * 1000; // 2 minutes
+        
+        if (cached && cacheTime && (now - parseInt(cacheTime)) < maxAge) {
+          const data = JSON.parse(cached);
+          if (mounted) {
+            setCouples(data);
+          }
+          return;
+        }
+
         const res = await fetch('/api/couples?status=approved&limit=100', {
-          cache: 'no-store',
+          cache: 'force-cache', // Use browser cache
         });
         const json = await res.json();
         if (mounted && json?.success) {
-          setCouples(json.data ?? []);
+          const data = json.data ?? [];
+          setCouples(data);
+          
+          // Cache the results
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+          sessionStorage.setItem(`${cacheKey}-time`, now.toString());
         }
       } catch (err) {
         // ignore
       }
     };
 
-    const id = setInterval(fetchCouples, 30_000);
+    // Initial fetch
+    fetchCouples();
+    
+    // Reduced frequency to 60 seconds
+    const id = setInterval(fetchCouples, 60_000);
     return () => {
       mounted = false;
       clearInterval(id);
@@ -69,14 +93,25 @@ export default function HomePageClient({
   }, [searchParams]);
 
   const handlePhotoAdded = () => {
-    // Refresh data after add
+    // Clear cache and refresh data after add
     (async () => {
       try {
+        // Clear cached data to force fresh fetch
+        sessionStorage.removeItem('homepage-couples');
+        sessionStorage.removeItem('homepage-couples-time');
+        
         const res = await fetch('/api/couples?status=approved&limit=100', {
           cache: 'no-store',
         });
         const json = await res.json();
-        if (json?.success) setCouples(json.data ?? []);
+        if (json?.success) {
+          const data = json.data ?? [];
+          setCouples(data);
+          
+          // Update cache with fresh data
+          sessionStorage.setItem('homepage-couples', JSON.stringify(data));
+          sessionStorage.setItem('homepage-couples-time', Date.now().toString());
+        }
       } catch {}
     })();
 

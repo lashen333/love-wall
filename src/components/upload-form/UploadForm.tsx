@@ -3,12 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Upload, User, CheckCircle } from 'lucide-react';
+import { CreditCard, Upload, User, CheckCircle, Copy, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import type { UploadFormData } from '@/types';
-import { resizeImage, generateThumbnail, validateImageFile } from '@/utils/imageUtils';
+import { resizeImage, generateThumbnail, validateImageFile, optimizeImage } from '@/utils/imageUtils';
 import { generateSecretCode } from '@/utils/heartUtils';
+import { copyToClipboard, showCopyFeedback } from '@/utils/clipboard';
 
 import StepIndicator from './StepIndicator';
 import PaymentStep from './steps/PaymentStep';
@@ -26,7 +27,8 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
   const [currentStep, setCurrentStep] = useState<Step>('payment');
   const [formData, setFormData] = useState<UploadFormData>({
     names: '',
-    email: '', // Add email field best
+    email: '',
+    phoneNumber: '',
     weddingDate: '',
     country: '',
     story: '',
@@ -36,6 +38,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
   const [uploadedThumb, setUploadedThumb] = useState<string>('');
   const [secretCode, setSecretCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     const paymentVerified = localStorage.getItem('payment_verified');
@@ -64,8 +67,12 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
 
     try {
       setLoading(true);
-      const resizedPhoto = await resizeImage(file);
-      const thumbnail = await generateThumbnail(file);
+      
+      // Use optimized image processing
+      const [resizedPhoto, thumbnail] = await Promise.all([
+        optimizeImage(file, 1920, 0.85), // Optimized main image
+        generateThumbnail(file, 400) // Thumbnail
+      ]);
 
       const photoUrl = URL.createObjectURL(resizedPhoto);
       const thumbUrl = URL.createObjectURL(thumbnail);
@@ -73,8 +80,9 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
       setUploadedPhoto(photoUrl);
       setUploadedThumb(thumbUrl);
       setFormData((prev) => ({ ...prev, photo: resizedPhoto }));
-      toast.success('Photo uploaded successfully!');
-    } catch {
+      toast.success('Photo uploaded and optimized successfully!');
+    } catch (error) {
+      console.error('Image processing error:', error);
       toast.error('Error processing photo. Please try again.');
     } finally {
       setLoading(false);
@@ -111,8 +119,10 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
   const handleSubmit = async () => {
     // Validation
     if (!formData.names.trim()) return toast.error('Please enter your names');
-    if (!formData.email.trim()) return toast.error('Please enter your email address');
-    if (!validateEmail(formData.email)) return toast.error('Please enter a valid email address');
+    if (!formData.email.trim() && !formData.phoneNumber.trim()) {
+      return toast.error('Please provide at least one contact method (email or phone)');
+    }
+    if (formData.email && !validateEmail(formData.email)) return toast.error('Please enter a valid email address');
     if (!formData.photo) return toast.error('Please upload a photo');
 
     try {
@@ -122,7 +132,8 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
 
       const submitData = new FormData();
       submitData.append('names', formData.names);
-      submitData.append('email', formData.email);
+      submitData.append('email', formData.email || '');
+      submitData.append('phoneNumber', formData.phoneNumber || '');
       submitData.append('weddingDate', formData.weddingDate || '');
       submitData.append('country', formData.country || '');
       submitData.append('story', formData.story || '');
@@ -133,12 +144,10 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
       const data = await response.json();
       
       if (data.success) {
-        // Send email with secret code
-        await sendSecretCodeEmail(formData.email, code, formData.names);
-        
-        toast.success('Photo submitted successfully! Check your email for your secret code.');
+        // Show success modal with secret code
+        toast.success('Photo submitted successfully! Save your secret code below.');
+        setShowSuccessModal(true);
         onPhotoAdded();
-        resetForm();
       } else {
         toast.error(data.error || 'Submission failed');
       }
@@ -150,37 +159,12 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
     }
   };
 
-  // Function to send email with secret code
-  const sendSecretCodeEmail = async (email: string, secretCode: string, names: string) => {
-    try {
-      const response = await fetch('/api/send-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          secretCode,
-          names,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!data.success) {
-        console.error('Failed to send email:', data.error);
-        toast.error('Photo submitted but failed to send email. Please save your code: ' + secretCode);
-      }
-    } catch (error) {
-      console.error('Error sending email:', error);
-      toast.error('Photo submitted but failed to send email. Please save your code: ' + secretCode);
-    }
-  };
 
   const resetForm = () => {
     setFormData({ 
       names: '', 
-      email: '', 
+      email: '',
+      phoneNumber: '',
       weddingDate: '', 
       country: '', 
       story: '', 
@@ -190,6 +174,18 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
     setUploadedThumb('');
     setSecretCode('');
     setCurrentStep('payment');
+    setShowSuccessModal(false);
+  };
+
+  const handleCopySecretCode = async () => {
+    if (!secretCode) return;
+    
+    const success = await copyToClipboard(secretCode);
+    if (success) {
+      toast.success('Secret code copied to clipboard!');
+    } else {
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   const nextStep = () => {
@@ -256,6 +252,69 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
           )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Success Modal with Secret Code */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl"
+          >
+            <div className="text-center">
+              {/* Success Icon */}
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Success! 🎉</h2>
+              <p className="text-gray-600 mb-6">Your photo has been submitted to the Love Wall!</p>
+              
+              {/* Secret Code Section */}
+              <div className="bg-pink-50 rounded-lg p-4 border border-pink-200 mb-6">
+                <h3 className="font-semibold text-pink-800 mb-2">Your Secret Code</h3>
+                <p className="text-sm text-pink-700 mb-3">Save this code to remove your photo later if needed:</p>
+                
+                <div className="bg-white rounded-lg p-3 border border-pink-300">
+                  <div className="flex items-center justify-between">
+                    <code className="text-lg font-mono text-pink-600 font-bold flex-1">
+                      {secretCode}
+                    </code>
+                    <button
+                      onClick={handleCopySecretCode}
+                      className="ml-3 flex items-center gap-2 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors duration-200 text-sm font-medium border border-pink-200"
+                      title="Click to copy secret code"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-pink-600 mt-2">
+                  💡 Click "Copy" to save your secret code to clipboard
+                </p>
+              </div>
+              
+              {/* Contact Info */}
+              <div className="bg-blue-50 rounded-lg p-3 mb-6">
+                <p className="text-sm text-blue-800">
+                  📧 Your contact information has been saved. 
+                  Make sure to save your secret code above for future reference!
+                </p>
+              </div>
+              
+              {/* Close Button */}
+              <button
+                onClick={resetForm}
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                Done
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

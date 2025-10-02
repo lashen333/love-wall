@@ -3,8 +3,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, Shield, AlertTriangle } from 'lucide-react';
+import { Trash2, Shield, AlertTriangle, Copy, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { copyToClipboard } from '@/utils/clipboard';
 
 export function PhotoRemoval() {
   const [formData, setFormData] = useState({
@@ -13,6 +14,32 @@ export function PhotoRemoval() {
     reason: ''
   });
   const [loading, setLoading] = useState(false);
+  const [showPasteHelper, setShowPasteHelper] = useState(false);
+
+  const handlePasteSecretCode = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && /^\d{8}$/.test(text.trim())) {
+        setFormData(prev => ({ ...prev, secretCode: text.trim() }));
+        toast.success('Secret code pasted from clipboard!');
+      } else {
+        toast.error('No valid 8-digit secret code found in clipboard');
+      }
+    } catch (error) {
+      toast.error('Unable to read clipboard. Please paste manually.');
+    }
+  };
+
+  const handleCopySecretCode = async () => {
+    if (!formData.secretCode) return;
+    
+    const success = await copyToClipboard(formData.secretCode);
+    if (success) {
+      toast.success('Secret code copied to clipboard!');
+    } else {
+      toast.error('Failed to copy to clipboard');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,16 +127,57 @@ export function PhotoRemoval() {
               placeholder="12345678"
               maxLength={8}
               pattern="[0-9]{8}"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono text-lg tracking-wider"
+              className="w-full px-4 py-3 pr-20 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono text-lg tracking-wider"
               required
             />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+              {formData.secretCode && (
+                <button
+                  type="button"
+                  onClick={handleCopySecretCode}
+                  className="p-1 hover:bg-gray-100 rounded"
+                  title="Copy secret code"
+                >
+                  <Copy className="w-4 h-4 text-gray-500" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handlePasteSecretCode}
+                className="p-1 hover:bg-gray-100 rounded"
+                title="Paste from clipboard"
+              >
+                <Search className="w-4 h-4 text-gray-500" />
+              </button>
               <Shield className="w-5 h-5 text-gray-400" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            This is the 8-digit code you received when you submitted your photo
-          </p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-gray-500">
+              This is the 8-digit code you received when you submitted your photo
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPasteHelper(!showPasteHelper)}
+              className="text-xs text-pink-600 hover:text-pink-700 underline"
+            >
+              {showPasteHelper ? 'Hide' : 'Need help?'}
+            </button>
+          </div>
+          
+          {showPasteHelper && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 mb-2">
+                <strong>Can't find your secret code?</strong>
+              </p>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li>• Check your email for the Love Wall confirmation message</li>
+                <li>• Look for SMS/WhatsApp messages from when you submitted</li>
+                <li>• Check your browser's clipboard history (Ctrl+Shift+V)</li>
+                <li>• Contact support if you still can't find it</li>
+              </ul>
+            </div>
+          )}
         </div>
 
         <div>

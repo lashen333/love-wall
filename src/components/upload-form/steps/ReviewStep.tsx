@@ -1,8 +1,10 @@
 // src\components\upload-form\steps\ReviewStep.tsx
 'use client';
 
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { ArrowLeft, CheckCircle, Copy } from 'lucide-react';
 import type { UploadFormData } from '@/types';
+import { copyToClipboard, showCopyFeedback } from '@/utils/clipboard';
 
 export default function ReviewStep({
   uploadedPhoto,
@@ -19,6 +21,16 @@ export default function ReviewStep({
   onBack: () => void;
   onSubmit: () => void;
 }) {
+  const copyButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleCopySecretCode = async () => {
+    if (!secretCode) return;
+    
+    const success = await copyToClipboard(secretCode);
+    if (copyButtonRef.current) {
+      showCopyFeedback(copyButtonRef.current, success);
+    }
+  };
   return (
     <div className="text-center">
       <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full grid place-items-center mx-auto mb-5 sm:mb-6">
@@ -66,10 +78,28 @@ export default function ReviewStep({
           <h4 className="font-semibold text-pink-800 mb-2">Important!</h4>
           <p className="text-sm text-pink-700 mb-3">Save this secret code to remove your photo later if needed:</p>
           <div className="bg-white rounded-lg p-3 border border-pink-300">
-            <code className="text-lg font-mono text-pink-600 font-bold">
-              {secretCode || 'Will be generated after submission'}
-            </code>
+            <div className="flex items-center justify-between">
+              <code className="text-lg font-mono text-pink-600 font-bold flex-1">
+                {secretCode || 'Will be generated after submission'}
+              </code>
+              {secretCode && (
+                <button
+                  ref={copyButtonRef}
+                  onClick={handleCopySecretCode}
+                  className="ml-3 flex items-center gap-2 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors duration-200 text-sm font-medium border border-pink-200"
+                  title="Click to copy secret code"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy
+                </button>
+              )}
+            </div>
           </div>
+          {secretCode && (
+            <p className="text-xs text-pink-600 mt-2 text-center">
+              💡 Click the "Copy" button to copy your secret code to clipboard
+            </p>
+          )}
         </div>
       </div>
 

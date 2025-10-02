@@ -44,15 +44,31 @@ export default function LoveCarousel({
 
   const [storyOf, setStoryOf] = useState<Couple | null>(null);
 
-  // fetch
+  // fetch with caching
   useEffect(() => {
     const ctrl = new AbortController();
     (async () => {
       try {
         setLoading(true);
         setErr(null);
+        
+        // Use cached data if available and not too old
+        const cacheKey = `photo-album-${fetchLimit}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        const cacheTime = sessionStorage.getItem(`${cacheKey}-time`);
+        const now = Date.now();
+        const maxAge = 5 * 60 * 1000; // 5 minutes
+        
+        if (cached && cacheTime && (now - parseInt(cacheTime)) < maxAge) {
+          const data = JSON.parse(cached);
+          setRows(data.rows);
+          setTotal(data.total);
+          setLoading(false);
+          return;
+        }
+        
         const res = await fetch(`/api/couples?status=approved&limit=${fetchLimit}`, {
-          cache: 'no-store',
+          cache: 'force-cache', // Use browser cache
           signal: ctrl.signal,
         });
         const json: ApiCouples = await res.json();
@@ -65,6 +81,10 @@ export default function LoveCarousel({
               new Date(a.createdAt ?? 0).getTime() -
               new Date(b.createdAt ?? 0).getTime()
           );
+
+        // Cache the results
+        sessionStorage.setItem(cacheKey, JSON.stringify({ rows: data, total: json.pagination.total }));
+        sessionStorage.setItem(`${cacheKey}-time`, now.toString());
 
         setRows(data);
         setTotal(json.pagination.total);

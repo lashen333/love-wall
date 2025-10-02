@@ -13,6 +13,17 @@ const coupleSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  email: {
+    type: String,
+    required: false,
+    trim: true,
+    lowercase: true,
+  },
+  phoneNumber: {
+    type: String,
+    required: false,
+    trim: true,
+  },
   weddingDate: {
     type: Date,
     required: false,
