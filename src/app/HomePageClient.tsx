@@ -2,6 +2,7 @@
 
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import  HeartWall  from '@/components/heart-wall/HeartWall';
@@ -223,12 +224,28 @@ export default function HomePageClient({
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 text-center text-gray-600">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-lg mb-4">Made with ❤️ for couples around the world</p>
-          <p className="text-sm">© 2025 World&apos;s Biggest Married Couple Photo Wall. All rights reserved.</p>
-        </div>
-      </footer>
+<footer className="py-12 px-4 text-center text-gray-600">
+  <div className="max-w-4xl mx-auto">
+    <p className="text-lg mb-4">Made with ❤️ for couples around the world</p>
+    
+    {/* Legal Links */}
+    <div className="flex flex-wrap items-center justify-center gap-2 text-sm mb-4">
+      <Link href="/terms" className="text-pink-600 hover:text-pink-700 underline">
+        Terms of Service
+      </Link>
+      <span className="text-gray-400">|</span>
+      <Link href="/privacy" className="text-pink-600 hover:text-pink-700 underline">
+        Privacy Policy
+      </Link>
+      <span className="text-gray-400">|</span>
+      <Link href="/refund-policy" className="text-pink-600 hover:text-pink-700 underline">
+        Refund Policy
+      </Link>
+    </div>
+    
+    <p className="text-sm">© 2025 World&apos;s Biggest Married Couple Photo Wall. All rights reserved.</p>
+  </div>
+</footer>
     </div>
   );
 }
