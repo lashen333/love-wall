@@ -1,8 +1,7 @@
-// src\lib\models\Payment.ts
 import mongoose from 'mongoose';
 
 const paymentSchema = new mongoose.Schema({
-  stripeSessionId: {
+  polarSessionId: {
     type: String,
     required: true,
     unique: true,
@@ -21,14 +20,14 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['created', 'paid', 'failed'],
+    enum: ['created', 'paid', 'failed'], 
     default: 'created',
     index: true,
   },
   coupleId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Couple',
-    required: false, // Will be set after couple creation
+    required: false,
   },
   metadata: {
     type: Map,
@@ -39,21 +38,19 @@ const paymentSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Index for efficient queries
+// Indexes remain the same
 paymentSchema.index({ status: 1, createdAt: -1 });
 paymentSchema.index({ coupleId: 1 });
 
-// Virtual for formatted amount
+// Virtual for formatted amount (unchanged)
 paymentSchema.virtual('formattedAmount').get(function() {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: this.currency.toUpperCase(),
-  }).format(this.amount / 100);
+  }).format(this.amount / 100); // Polar amounts in cents too
 });
 
-// Ensure virtuals are serialized
 paymentSchema.set('toJSON', { virtuals: true });
 paymentSchema.set('toObject', { virtuals: true });
 
 export default mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
-

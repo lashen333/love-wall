@@ -1,47 +1,37 @@
-// src\app\api\checkout\route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-});
 
 export async function POST(request: NextRequest) {
   try {
-    const { amount } = await request.json();
+    // Amount is fixed in Polar product, so no need for body amount (remove if not custom)
+    const { } = await request.json(); // If you add custom data later, parse here
     
-    if (!amount || amount < 100) {
+    // Create Polar checkout session
+    const response = await fetch('https://api.polar.sh/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.POLAR_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        products: [process.env.POLAR_PRODUCT_ID], // Your $1 product ID
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/success?session_id={CHECKOUT_ID}`,
+        return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}`, // For cancel/back
+        metadata: {
+          product: 'photo_wall_submission',
+          // Add more if needed, e.g., user details
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
       return NextResponse.json(
-        { success: false, error: 'Invalid amount' },
-        { status: 400 }
+        { success: false, error: error.message || 'Failed to create checkout session' },
+        { status: 500 }
       );
     }
-    
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Photo Wall Submission',
-              description: 'Add your wedding photo to the World\'s Biggest Married Couple Photo Wall',
-              images: ['https://via.placeholder.com/300x200/ec4899/ffffff?text=Photo+Wall'],
-            },
-            unit_amount: amount, // Amount in cents
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}`,
-      metadata: {
-        product: 'photo_wall_submission',
-        amount: amount.toString(),
-      },
-    });
+
+    const session = await response.json();
     
     return NextResponse.json({
       success: true,

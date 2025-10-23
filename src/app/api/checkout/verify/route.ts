@@ -1,10 +1,4 @@
-// src\app\api\checkout\verify\route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,33 +11,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Retrieve the checkout session from Stripe
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    // Retrieve the checkout session from Polar.sh
+    const response = await fetch(`https://api.polar.sh/v1/checkouts/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.POLAR_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (!session) {
+    if (!response.ok) {
       return NextResponse.json(
         { success: false, error: 'Session not found' },
         { status: 404 }
       );
     }
 
+    const session = await response.json();
+
     // Check if payment was successful
-    if (session.payment_status !== 'paid') {
+    if (session.status !== 'succeeded') {
       return NextResponse.json(
         { success: false, error: 'Payment not completed' },
         { status: 400 }
       );
     }
 
-    // Return payment details
+    // Return payment details (adapt to Polar's response fields)
     return NextResponse.json({
       success: true,
       data: {
         sessionId: session.id,
-        amount: session.amount_total,
+        amount: session.total_amount, // In cents
         currency: session.currency,
-        status: session.payment_status,
-        customerEmail: session.customer_details?.email,
+        status: session.status,
+        customerEmail: session.customer_email,
       },
     });
 
@@ -55,4 +57,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

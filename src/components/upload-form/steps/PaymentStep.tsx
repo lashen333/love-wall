@@ -1,4 +1,3 @@
-// src\components\upload-form\steps\PaymentStep.tsx
 'use client';
 
 import { useState } from 'react';
@@ -28,10 +27,10 @@ export default function PaymentStep({
       <div className="bg-pink-50 rounded-lg p-4 sm:p-5 mb-6 max-w-md mx-auto">
         <div className="text-2xl font-bold text-pink-600 mb-1">$1.00</div>
         <div className="text-sm text-gray-600">One-time fee per photo</div>
-        <div className="text-xs text-gray-500 mt-1">Secure payment via Stripe</div>
+        <div className="text-xs text-gray-500 mt-1">Secure payment via Polar</div>
       </div>
 
-      {/* Terms Acceptance Checkbox */}
+      {/* Terms Acceptance Checkbox (unchanged) */}
       <label className="flex items-start gap-2 text-sm text-gray-700 mb-4 max-w-md mx-auto text-left">
         <input
           type="checkbox"
