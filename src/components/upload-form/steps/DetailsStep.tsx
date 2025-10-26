@@ -1,4 +1,4 @@
-// src/components/upload-form/steps/DetailsStep.tsx
+// src\components\upload-form\steps\DetailsStep.tsx
 'use client';
 
 import { useState } from 'react';
@@ -102,10 +102,7 @@ export default function DetailsStep({
 
         {/* Contact Methods Section */}
         <div className="space-y-4">
-          <div className="text-center">
-            <h4 className="text-lg font-semibold text-gray-800 mb-2">How would you like to receive your secret code?</h4>
-            <p className="text-sm text-gray-600">Choose at least one method</p>
-          </div>
+          
 
           {/* Email Field - Optional */}
           <div>
@@ -130,7 +127,7 @@ export default function DetailsStep({
           {/* Phone Number Field - Optional */}
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-              <Phone className="w-4 h-4 mr-2 text-green-500" />
+              <Phone className="w-4 h-4 mr-2  text-pink-500" />
               Phone Number
             </label>
             <input
@@ -146,7 +143,7 @@ export default function DetailsStep({
               <p className="text-red-500 text-xs mt-1">{errors.phoneNumber}</p>
             )}
             <p className="text-xs text-gray-500 mt-1">
-              📱 Your phone number will be stored for contact purposes
+              Your phone number will be stored for contact purposes
             </p>
           </div>
 
@@ -198,7 +195,7 @@ export default function DetailsStep({
 
       {/* Required fields notice */}
       <div className="text-xs text-gray-500 text-center py-2 mt-4">
-        * Required fields • Choose at least one contact method to receive your secret code
+        * Required fields are marked with an asterisk
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 justify-between mt-8 max-w-md mx-auto">

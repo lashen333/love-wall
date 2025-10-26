@@ -199,7 +199,7 @@ export default function UploadForm({ onPhotoAdded }: UploadFormProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto p-4 sm:p-6">
+    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto p-4 sm:p-6" id="add">
       {/* ===== TOP HEADER (always visible) ===== */}
       <div className="text-center mb-4">
         <h2 className="text-2xl sm:text-3xl font-bold gradient-text mb-2">Join the Love Wall</h2>
