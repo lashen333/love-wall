@@ -32,9 +32,12 @@ export default function HeartGrid({ couples, onPick }: Props) {
     [size]
   );
 
-  // Memoize approved couples to prevent unnecessary filtering
+  // Memoize approved couples sorted by latest first
   const approved = useMemo(
-    () => couples.filter((c) => c.status === "approved"),
+    () => 
+      couples
+        .filter((c) => c.status === "approved")
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [couples]
   );
   

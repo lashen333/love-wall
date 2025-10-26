@@ -32,7 +32,7 @@ export function PhotoRemoval() {
 
   const handleCopySecretCode = async () => {
     if (!formData.secretCode) return;
-    
+
     const success = await copyToClipboard(formData.secretCode);
     if (success) {
       toast.success('Secret code copied to clipboard!');
@@ -43,7 +43,7 @@ export function PhotoRemoval() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.names.trim() || !formData.secretCode.trim()) {
       toast.error('Please fill in all required fields');
       return;
@@ -51,7 +51,7 @@ export function PhotoRemoval() {
 
     try {
       setLoading(true);
-      
+
       const response = await fetch('/api/couples/remove', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,7 +59,7 @@ export function PhotoRemoval() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success('Photo removed successfully');
         setFormData({ names: '', secretCode: '', reason: '' });
@@ -164,15 +164,13 @@ export function PhotoRemoval() {
               {showPasteHelper ? 'Hide' : 'Need help?'}
             </button>
           </div>
-          
+
           {showPasteHelper && (
             <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800 mb-2">
                 <strong>Can't find your secret code?</strong>
               </p>
               <ul className="text-xs text-blue-700 space-y-1">
-                <li>• Check your email for the Love Wall confirmation message</li>
-                <li>• Look for SMS/WhatsApp messages from when you submitted</li>
                 <li>• Check your browser's clipboard history (Ctrl+Shift+V)</li>
                 <li>• Contact support if you still can't find it</li>
               </ul>
@@ -214,7 +212,6 @@ export function PhotoRemoval() {
         <div className="space-y-2 text-sm text-gray-600">
           <p>• Make sure you're using the exact names you submitted</p>
           <p>• Your secret code is 8 digits long (numbers only)</p>
-          <p>• Check your email for the secret code if you can't find it</p>
           <p>• Contact support if you continue having issues</p>
         </div>
       </div>

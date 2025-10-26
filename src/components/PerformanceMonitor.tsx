@@ -1,3 +1,4 @@
+// src\components\PerformanceMonitor.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
