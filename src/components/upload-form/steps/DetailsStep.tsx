@@ -84,7 +84,7 @@ export default function DetailsStep({
       <div className="space-y-5 sm:space-y-6 max-w-md mx-auto">
         {/* Names Field - Required */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Your Names *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Your Names **</label>
           <input
             type="text"
             value={formData.names}
@@ -107,8 +107,8 @@ export default function DetailsStep({
           {/* Email Field - Optional */}
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-              <Mail className="w-4 h-4 mr-2 text-pink-500" />
-              Email Address
+              
+              Email Address *
             </label>
             <input
               type="email"
@@ -127,8 +127,8 @@ export default function DetailsStep({
           {/* Phone Number Field - Optional */}
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-              <Phone className="w-4 h-4 mr-2  text-pink-500" />
-              Phone Number
+              
+              Phone Number *
             </label>
             <input
               type="tel"

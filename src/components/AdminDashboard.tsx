@@ -20,9 +20,21 @@ export function AdminDashboard({ password }: AdminDashboardProps) {
     fetchCouples();
   }, []);
 
+  // Broadcast approval events to all tabs
+  const broadcastApproval = () => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('couple-approvals');
+      channel.postMessage({ action: 'approved' });
+      channel.close();
+    }
+  };
+
   const fetchCouples = async () => {
     try {
-      const response = await fetch('/api/couples?status=pending&limit=100');
+      // Fetch all couples to get accurate stats
+      const response = await fetch('/api/couples?limit=1000&t=' + Date.now(), {
+        cache: 'no-store',
+      });
       const data = await response.json();
       if (data.success) {
         setCouples(data.data);
@@ -44,8 +56,22 @@ export function AdminDashboard({ password }: AdminDashboardProps) {
 
       const data = await response.json();
       if (data.success) {
-        toast.success('Photo approved!');
-        fetchCouples(); // Refresh the list
+        toast.success('Photo approved! It will appear on the wall within seconds.');
+        
+        // Note: We removed sessionStorage.clear() because:
+        // 1. sessionStorage is NOT localStorage - it's safe
+        // 2. But we're being careful to only clear cache keys
+        // 3. localStorage (payment_verified) is NEVER touched by us
+        sessionStorage.removeItem('homepage-couples');
+        sessionStorage.removeItem('homepage-couples-time');
+        sessionStorage.removeItem('photo-album-200');
+        sessionStorage.removeItem('photo-album-200-time');
+        
+        // Broadcast to all tabs that a photo was approved
+        broadcastApproval();
+        
+        // Refresh the list
+        fetchCouples();
       } else {
         toast.error(data.error || 'Failed to approve');
       }

@@ -47,7 +47,18 @@ export default function LoveCarousel({
   // fetch with caching
   useEffect(() => {
     const ctrl = new AbortController();
-    (async () => {
+    
+    // Listen for approval events from admin panel
+    const channel = new BroadcastChannel('couple-approvals');
+    channel.onmessage = () => {
+      // Clear cache and refresh when an approval happens
+      sessionStorage.removeItem(`photo-album-${fetchLimit}`);
+      sessionStorage.removeItem(`photo-album-${fetchLimit}-time`);
+      // Force a refresh by updating fetchLimit dependency
+      setRows([]);
+    };
+    
+    const fetchData = async () => {
       try {
         setLoading(true);
         setErr(null);
@@ -57,7 +68,7 @@ export default function LoveCarousel({
         const cached = sessionStorage.getItem(cacheKey);
         const cacheTime = sessionStorage.getItem(`${cacheKey}-time`);
         const now = Date.now();
-        const maxAge = 5 * 60 * 1000; // 5 minutes
+        const maxAge = 30 * 1000; // 30 seconds (reduced for faster updates)
         
         if (cached && cacheTime && (now - parseInt(cacheTime)) < maxAge) {
           const data = JSON.parse(cached);
@@ -67,8 +78,8 @@ export default function LoveCarousel({
           return;
         }
         
-        const res = await fetch(`/api/couples?status=approved&limit=${fetchLimit}`, {
-          cache: 'force-cache', // Use browser cache
+        const res = await fetch(`/api/couples?status=approved&limit=${fetchLimit}&t=${Date.now()}`, {
+          cache: 'no-store', // Always fetch fresh data
           signal: ctrl.signal,
         });
         const json: ApiCouples = await res.json();
@@ -93,8 +104,14 @@ export default function LoveCarousel({
       } finally {
         setLoading(false);
       }
-    })();
-    return () => ctrl.abort();
+    };
+    
+    fetchData();
+    
+    return () => {
+      ctrl.abort();
+      channel.close();
+    };
   }, [fetchLimit]);
 
   // slides (CTA at index 0)

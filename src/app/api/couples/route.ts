@@ -54,6 +54,12 @@ export async function GET(request: NextRequest) {
       success: true,
       data: normalized,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error('Error fetching couples:', error);

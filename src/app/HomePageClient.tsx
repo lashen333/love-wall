@@ -29,6 +29,15 @@ export default function HomePageClient({
   useEffect(() => {
     let mounted = true;
 
+    // Listen for approval events from admin panel
+    const channel = new BroadcastChannel('couple-approvals');
+    channel.onmessage = () => {
+      // Clear cache and refresh when an approval happens
+      sessionStorage.removeItem('homepage-couples');
+      sessionStorage.removeItem('homepage-couples-time');
+      fetchCouples();
+    };
+
     const fetchCouples = async () => {
       try {
         // Check if we have recent cached data
@@ -36,7 +45,7 @@ export default function HomePageClient({
         const cached = sessionStorage.getItem(cacheKey);
         const cacheTime = sessionStorage.getItem(`${cacheKey}-time`);
         const now = Date.now();
-        const maxAge = 2 * 60 * 1000; // 2 minutes
+        const maxAge = 30 * 1000; // 30 seconds (reduced for faster updates)
         
         if (cached && cacheTime && (now - parseInt(cacheTime)) < maxAge) {
           const data = JSON.parse(cached);
@@ -46,8 +55,8 @@ export default function HomePageClient({
           return;
         }
 
-        const res = await fetch('/api/couples?status=approved&limit=100', {
-          cache: 'force-cache', // Use browser cache
+        const res = await fetch('/api/couples?status=approved&limit=100&t=' + Date.now(), {
+          cache: 'no-store', // ✅ REMOVED: 'force-cache' was showing stale data
         });
         const json = await res.json();
         if (mounted && json?.success) {
@@ -66,11 +75,12 @@ export default function HomePageClient({
     // Initial fetch
     fetchCouples();
     
-    // Reduced frequency to 60 seconds
-    const id = setInterval(fetchCouples, 60_000);
+    // Check for updates every 15 seconds to see new approvals quickly
+    const id = setInterval(fetchCouples, 15_000);
     return () => {
       mounted = false;
       clearInterval(id);
+      channel.close();
     };
   }, []);
 
